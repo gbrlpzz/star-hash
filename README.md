@@ -1,8 +1,10 @@
 # Star Hash (Timestamp)
 
-`star-hash` (command: `timestamp`) generates a visual cryptographic stamp based on the exact arrangement of celestial bodies for a specific moment and location on Earth.
+**`star-hash`** (CLI: `timestamp`) generates a **cryptographic celestial projection** based on the precise ephemeris data for a specific temporal epoch and geodetic location.
 
-**It contains no text.** The geometry itself is the data.
+**It exploits the astronomical uniqueness of the sky.** The geometric arrangement of the celestial sphere is an implicit hash of spacetime.
+
+**No plaintext.** The data is encoded entirely in the relative astrometry.
 
 ## The Method
 

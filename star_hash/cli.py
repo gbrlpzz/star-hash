@@ -48,15 +48,15 @@ def create(
     city_name = "Unknown"
     
     if lat is None or lon is None:
-        typer.echo("📍 Detecting location via IP...")
+        typer.echo("📍 Calculating coordinates from IP...")
         lat, lon, city_name = get_current_location()
-        loc_source = "IP-GEOLOCATION"
+        loc_source = "IP-Geolocation"
 
     # Precise logging
-    typer.echo("\n--- TIMESTAMP DATA ---")
-    typer.echo(f"Time   : {time.isoformat()} ({time_source})")
-    typer.echo(f"Place  : {city_name} [{lat:.4f}, {lon:.4f}] ({loc_source})")
-    typer.echo("----------------------\n")
+    typer.echo("\n--- OBSERVER PARAMETERS ---")
+    typer.echo(f"Epoch (UTC): {time.isoformat()} (Source: {time_source})")
+    typer.echo(f"Location   : {city_name} [{lat:.4f}, {lon:.4f}] (Source: {loc_source})")
+    typer.echo("---------------------------\n")
 
     # Determine output path
     if output is None:
@@ -68,7 +68,7 @@ def create(
     elif not output.endswith('.svg'):
         output += ".svg"
         
-    typer.echo(f"Generating cipher for {city_name} ({lat:.4f}, {lon:.4f}) at {time.isoformat()}")
+    typer.echo(f"Calculating topocentric apparent positions (Epoch J2000 -> {time.date().isoformat()})...")
     
     # 1. Load stars with precession applied to target date
     star_bodies = get_stars_for_date(time)
@@ -81,31 +81,54 @@ def create(
     for p in planets:
         bodies.append((p.ra, p.dec, p.mag, p.name, 'planet'))
         
-    typer.echo(f"Loaded {len(star_bodies)} stars + {len(planets)} planets (with precession)")
+    typer.echo(f"Catalog: {len(star_bodies)} stars, {len(planets)} planets.")
         
+    # 3b. Generate Ecliptic (Solar Path)
+    # Simulate Sun position for +/- 6 months to trace the ecliptic of date
+    ecliptic_points = []
+    import astronomy
+    from datetime import timedelta
+    
+    # Trace 360 degrees. Sun moves ~1 deg/day.
+    # We want a smooth line. Step 2 days is fine.
+    # Center on current time to ensure no gap near the Sun.
+    for d in range(-185, 185, 2):
+        sim_time = time + timedelta(days=d)
+        astro_time = astronomy.Time.Make(
+            sim_time.year, sim_time.month, sim_time.day, 
+            sim_time.hour, sim_time.minute, sim_time.second
+        )
+        # Calculate Sun RA/Dec of date
+        pos = astronomy.Equator(astronomy.Body.Sun, astro_time, astronomy.Observer(0,0,0), True, True)
+        ecliptic_points.append((pos.ra, pos.dec, 0.0, 'ecliptic', 'ecliptic'))
+        
+    bodies.extend(ecliptic_points)
+    typer.echo(f"Ecliptic: {len(ecliptic_points)} reference points computed.")
+
     # 4. Project
     projected = calculate_projection(bodies, lat, lon, time)
-    typer.echo(f"Visible: {len(projected)} bodies above horizon")
+    visible_count = len(projected)
+    typer.echo(f"Stereographic Projection: Zenith-centered. Visible objects: {visible_count}")
     
     # 5. Debug output for reverse-engineering verification
     if debug:
-        typer.echo("\n--- Projection Data (for verification) ---")
+        typer.echo("\n--- CALCULATION DATA ---")
         sun_proj = next((b for b in projected if b.name == 'Sun'), None)
         moon_proj = next((b for b in projected if b.name == 'Moon'), None)
         if sun_proj:
-            typer.echo(f"Sun: x={sun_proj.x:.4f}, y={sun_proj.y:.4f}")
+            typer.echo(f"Sun Altitude : x={sun_proj.x:.4f}, y={sun_proj.y:.4f}")
         else:
-            typer.echo("Sun: below horizon")
+            typer.echo("Sun Position : [Below Horizon]")
         if moon_proj:
-            typer.echo(f"Moon: x={moon_proj.x:.4f}, y={moon_proj.y:.4f}")
+            typer.echo(f"Moon Altitude: x={moon_proj.x:.4f}, y={moon_proj.y:.4f}")
         else:
-            typer.echo("Moon: below horizon")
-        typer.echo(f"Total visible stars: {len([b for b in projected if b.type == 'star'])}")
+            typer.echo("Moon Position: [Below Horizon]")
+        typer.echo(f"Star Count   : {len([b for b in projected if b.type == 'star'])}")
     
     # 6. Render
     generate_stamp(projected, output, None, size)
     
-    typer.echo(f"Cipher saved to {output}")
+    typer.echo(f"Cipher generation complete. Artifact written to: {output}")
 
 if __name__ == "__main__":
     app()

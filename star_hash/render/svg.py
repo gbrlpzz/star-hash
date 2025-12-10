@@ -57,6 +57,41 @@ def generate_stamp(
     dwg.add(dwg.line(start=(center-zenith_len, center), end=(center+zenith_len, center), stroke='black', stroke_width=ONE_POINT_PX*0.3))
     dwg.add(dwg.line(start=(center, center-zenith_len), end=(center, center+zenith_len), stroke='black', stroke_width=ONE_POINT_PX*0.3))
     
+    # Local Meridian (North-South Line)
+    # North is Up (y-), South is Down (y+). Zenith is Center.
+    # We draw a very fine line from top to bottom of the horizon ring.
+    # Radius of horizon is radius_path.
+    dwg.add(dwg.line(
+        start=(center, center - radius_path), 
+        end=(center, center + radius_path), 
+        stroke='black', 
+        stroke_width=ONE_POINT_PX * 0.1, # Extremely thin hairline
+        stroke_dasharray=f"{ONE_POINT_PX*0.5},{ONE_POINT_PX*2}",
+        opacity=0.4
+    ))
+    
+    # Cardinal Ticks (N, E, S, W)
+    # North (Top), South (Bottom), East (Right), West (Left)
+    tick_len = ONE_POINT_PX * 1.5 * scale
+    cardinals = [
+        (center, center - radius_path), # N
+        (center, center + radius_path), # S
+        (center + radius_path, center), # E
+        (center - radius_path, center)  # W
+    ]
+    for cx, cy in cardinals:
+        # Vector from center to point
+        vx, vy = cx - center, cy - center
+        # Normalize
+        dist = (vx**2 + vy**2)**0.5
+        vx, vy = vx/dist, vy/dist
+        
+        # Draw tick moving INWARD from the ring
+        p1 = (cx, cy)
+        p2 = (cx - vx*tick_len, cy - vy*tick_len)
+        
+        dwg.add(dwg.line(start=p1, end=p2, stroke='black', stroke_width=BORDER_WIDTH_PX))
+    
     # 1. Identify Sun and Moon for angle calculation
     # They are in the list (even if r > 1, per updated projection)
     sun_body = next((b for b in bodies if b.name == 'Sun'), None)
@@ -102,7 +137,32 @@ def generate_stamp(
     body_group = dwg.g(clip_path=f"url(#{clip_id})")
     dwg.add(body_group)
 
+    # 0. Draw Ecliptic Path (Solar Path)
+    # Collect ecliptic points
+    ecliptic_points = [b for b in bodies if b.type == 'ecliptic']
+    if ecliptic_points:
+        ecl_coords = []
+        for p in ecliptic_points:
+            sx = center + p.x * radius_path
+            sy = center + p.y * radius_path
+            ecl_coords.append((sx, sy))
+        
+        # Draw as a polyline
+        # Use a very subtle dashed line
+        body_group.add(dwg.polyline(
+            points=ecl_coords,
+            fill='none',
+            stroke='black',
+            stroke_width=ONE_POINT_PX * 0.15,
+            stroke_dasharray=f"{ONE_POINT_PX},{ONE_POINT_PX*2}", # Dash dot? Or just loose dash
+            opacity=0.6
+        ))
+
     for body in projected_visible:
+        # Skip ecliptic points in the main loop (they are drawn as line)
+        if body.type == 'ecliptic':
+            continue
+
         sx = center + body.x * radius_path
         sy = center + body.y * radius_path
         pt = ONE_POINT_PX * scale
