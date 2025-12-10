@@ -37,14 +37,26 @@ def create(
     Output: SVG only (transparent background).
     Default size: 3cm @ 300 DPI (354px).
     """
+    # Determine source of time
+    time_source = "USER-PROVIDED"
     if time is None:
         time = datetime.now()
-
+        time_source = "SYSTEM CLICK"
+        
     # Auto-detect location if needed
+    loc_source = "USER-PROVIDED"
     city_name = "Unknown"
+    
     if lat is None or lon is None:
-        typer.echo("Detecting location...")
+        typer.echo("📍 Detecting location via IP...")
         lat, lon, city_name = get_current_location()
+        loc_source = "IP-GEOLOCATION"
+
+    # Precise logging
+    typer.echo("\n--- TIMESTAMP DATA ---")
+    typer.echo(f"Time   : {time.isoformat()} ({time_source})")
+    typer.echo(f"Place  : {city_name} [{lat:.4f}, {lon:.4f}] ({loc_source})")
+    typer.echo("----------------------\n")
 
     # Determine output path
     if output is None:
