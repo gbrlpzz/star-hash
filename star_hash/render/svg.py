@@ -21,13 +21,27 @@ def generate_stamp(
     """
     ONE_POINT_PX = 300.0 / 72.0  # ~4.1667 px
     
-    # Visual Hierarchy (Stroke Widths in Points)
-    # User requested "slightly thicker" and "proportional hierarchy"
-    W_HEAVY    = 1.5 * ONE_POINT_PX  # Horizon Ring
-    W_MEDIUM   = 1.2 * ONE_POINT_PX  # Sun, Cardinal Ticks
-    W_REGULAR  = 0.8 * ONE_POINT_PX  # Planets
-    W_FINE     = 0.5 * ONE_POINT_PX  # Zenith Crosshair
-    W_HAIRLINE = 0.35 * ONE_POINT_PX # Ecliptic, Meridian
+    # Visual Hierarchy (Simplified Two-Tone)
+    # User requested: "less variety", "thick and light", "both lighter than 1pt"
+    # Primary: Structural Elements (Horizon, Sun, Cardinals)
+    # Secondary: Data/Reference Elements (Planets, Grid, Ecliptic)
+    
+    W_PRIMARY   = 0.75 * ONE_POINT_PX 
+    W_SECONDARY = 0.35 * ONE_POINT_PX
+    
+    # Aliases for code readability (mapping logical roles to the two weights)
+    W_HEAVY    = W_PRIMARY
+    W_MEDIUM   = W_PRIMARY
+    W_REGULAR  = W_SECONDARY
+    W_FINE     = W_SECONDARY
+    W_HAIRLINE = W_SECONDARY  # Could go slightly thinner if grid needs to recede? 
+    # Let's keep it simple as requested: "two weights".
+    # usage:
+    # Horizon -> W_HEAVY (Primary)
+    # Sun, Ticks -> W_MEDIUM (Primary)
+    # Planets -> W_REGULAR (Secondary)
+    # Zenith -> W_FINE (Secondary)
+    # Grid -> W_HAIRLINE (Secondary)
     
     # Border stroke width (Horizon)
     BORDER_WIDTH_PX = W_HEAVY
