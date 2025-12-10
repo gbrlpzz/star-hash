@@ -1,6 +1,4 @@
-# Star Cipher (Timestamp)
-
-> **A celestial hash of space and time.**
+# Star Hash (Timestamp)
 
 `star-hash` (command: `timestamp`) generates a visual cryptographic stamp based on the exact arrangement of celestial bodies for a specific moment and location on Earth.
 
