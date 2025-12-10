@@ -21,8 +21,16 @@ def generate_stamp(
     """
     ONE_POINT_PX = 300.0 / 72.0  # ~4.1667 px
     
-    # Border stroke width: Exactly 1pt
-    BORDER_WIDTH_PX = ONE_POINT_PX
+    # Visual Hierarchy (Stroke Widths in Points)
+    # User requested "slightly thicker" and "proportional hierarchy"
+    W_HEAVY    = 1.5 * ONE_POINT_PX  # Horizon Ring
+    W_MEDIUM   = 1.2 * ONE_POINT_PX  # Sun, Cardinal Ticks
+    W_REGULAR  = 0.8 * ONE_POINT_PX  # Planets
+    W_FINE     = 0.5 * ONE_POINT_PX  # Zenith Crosshair
+    W_HAIRLINE = 0.35 * ONE_POINT_PX # Ecliptic, Meridian
+    
+    # Border stroke width (Horizon)
+    BORDER_WIDTH_PX = W_HEAVY
     
     # Radius logic matching SVG (pixel perfect)
     radius_path = (size / 2.0) - (BORDER_WIDTH_PX / 2.0)
@@ -30,6 +38,21 @@ def generate_stamp(
     inner_r = radius_path * 0.7
     scale = size / 472.0
     
+    # Apply scale to all widths relative to canvas size if needed? 
+    # The 'scale' var handles the 354 vs 472 sizing.
+    # But usually stroke widths should scale with the image size.
+    # The constants above are base pixels at 1:1 scale if scale=1?
+    # No, ONE_POINT_PX is fixed spacing.
+    # If we want the *appearance* of 1pt at 300dpi, we use ONE_POINT_PX.
+    # But 'scale' is `size / 472`.
+    # Let's scale the strokes by `scale` to maintain relative weight at different output sizes.
+    W_HEAVY    *= scale
+    W_MEDIUM   *= scale
+    W_REGULAR  *= scale
+    W_FINE     *= scale
+    W_HAIRLINE *= scale
+    BORDER_WIDTH_PX = W_HEAVY
+
     dwg = svgwrite.Drawing(output_path, profile='full', size=(size, size))
     
     # Horizon Ring
@@ -38,40 +61,37 @@ def generate_stamp(
         r=radius_path, 
         fill='none', 
         stroke='black', 
-        stroke_width=BORDER_WIDTH_PX,
+        stroke_width=W_HEAVY,
         shape_rendering='geometricPrecision'
     ))
     
-    # Inner Ring
+    # Inner Ring (Subtle)
     dwg.add(dwg.circle(
         center=(center, center), 
         r=inner_r, 
         fill='none', 
         stroke='black', 
-        stroke_width=ONE_POINT_PX * 0.15,
+        stroke_width=W_HAIRLINE,
         opacity=0.5
     ))
     
     # Zenith Crosshair
     zenith_len = ONE_POINT_PX * 0.8 * scale
-    dwg.add(dwg.line(start=(center-zenith_len, center), end=(center+zenith_len, center), stroke='black', stroke_width=ONE_POINT_PX*0.3))
-    dwg.add(dwg.line(start=(center, center-zenith_len), end=(center, center+zenith_len), stroke='black', stroke_width=ONE_POINT_PX*0.3))
+    dwg.add(dwg.line(start=(center-zenith_len, center), end=(center+zenith_len, center), stroke='black', stroke_width=W_FINE))
+    dwg.add(dwg.line(start=(center, center-zenith_len), end=(center, center+zenith_len), stroke='black', stroke_width=W_FINE))
     
     # Local Meridian (North-South Line)
     # North is Up (y-), South is Down (y+). Zenith is Center.
-    # We draw a very fine line from top to bottom of the horizon ring.
-    # Radius of horizon is radius_path.
     dwg.add(dwg.line(
         start=(center, center - radius_path), 
         end=(center, center + radius_path), 
         stroke='black', 
-        stroke_width=ONE_POINT_PX * 0.1, # Extremely thin hairline
-        stroke_dasharray=f"{ONE_POINT_PX*0.5},{ONE_POINT_PX*2}",
+        stroke_width=W_HAIRLINE, 
+        stroke_dasharray=f"{ONE_POINT_PX*scale*0.5},{ONE_POINT_PX*scale*2}",
         opacity=0.4
     ))
     
     # Cardinal Ticks (N, E, S, W)
-    # North (Top), South (Bottom), East (Right), West (Left)
     tick_len = ONE_POINT_PX * 1.5 * scale
     cardinals = [
         (center, center - radius_path), # N
@@ -80,39 +100,24 @@ def generate_stamp(
         (center - radius_path, center)  # W
     ]
     for cx, cy in cardinals:
-        # Vector from center to point
         vx, vy = cx - center, cy - center
-        # Normalize
         dist = (vx**2 + vy**2)**0.5
         vx, vy = vx/dist, vy/dist
-        
-        # Draw tick moving INWARD from the ring
         p1 = (cx, cy)
         p2 = (cx - vx*tick_len, cy - vy*tick_len)
-        
-        dwg.add(dwg.line(start=p1, end=p2, stroke='black', stroke_width=BORDER_WIDTH_PX))
+        dwg.add(dwg.line(start=p1, end=p2, stroke='black', stroke_width=W_MEDIUM))
     
     # 1. Identify Sun and Moon for angle calculation
-    # They are in the list (even if r > 1, per updated projection)
     sun_body = next((b for b in bodies if b.name == 'Sun'), None)
     moon_body = next((b for b in bodies if b.name == 'Moon'), None)
     
     moon_angle_deg = 0.0
     if sun_body and moon_body:
-        # Calculate angle from Moon to Sun in projection plane
-        # y is naturally inverted in SVG processing logic later (sy = center + y*r), 
-        # but projection.y includes the flip (-r*cos).
-        # So sx, sy are direct cartesian coordinates on the canvas centered at (0,0).
-        # We can work in unit coordinates for angle.
         dx = sun_body.x - moon_body.x
         dy = sun_body.y - moon_body.y
-        moon_angle_rad = math.atan2(dy, dx)
-        moon_angle_deg = math.degrees(moon_angle_rad)
+        moon_angle_deg = math.degrees(math.atan2(dy, dx))
     
-    # Filter visible bodies (Stars/Planets inside horizon)
-    # Sun/Moon are special: if inside, draw them. If outside, don't.
-    # But for Moon, we need its phase info which is on the object.
-    
+    # Filter visible bodies
     projected_visible = []
     
     for b in bodies:
@@ -138,7 +143,6 @@ def generate_stamp(
     dwg.add(body_group)
 
     # 0. Draw Ecliptic Path (Solar Path)
-    # Collect ecliptic points
     ecliptic_points = [b for b in bodies if b.type == 'ecliptic']
     if ecliptic_points:
         ecl_coords = []
@@ -147,19 +151,16 @@ def generate_stamp(
             sy = center + p.y * radius_path
             ecl_coords.append((sx, sy))
         
-        # Draw as a polyline
-        # Use a very subtle dashed line
         body_group.add(dwg.polyline(
             points=ecl_coords,
             fill='none',
             stroke='black',
-            stroke_width=ONE_POINT_PX * 0.15,
-            stroke_dasharray=f"{ONE_POINT_PX},{ONE_POINT_PX*2}", # Dash dot? Or just loose dash
+            stroke_width=W_HAIRLINE,
+            stroke_dasharray=f"{ONE_POINT_PX*scale},{ONE_POINT_PX*scale*2}",
             opacity=0.6
         ))
 
     for body in projected_visible:
-        # Skip ecliptic points in the main loop (they are drawn as line)
         if body.type == 'ecliptic':
             continue
 
@@ -168,7 +169,7 @@ def generate_stamp(
         pt = ONE_POINT_PX * scale
         
         if body.name == 'Sun':
-            _render_sun(dwg, body_group, sx, sy, pt)
+            _render_sun(dwg, body_group, sx, sy, pt, W_MEDIUM)
         elif body.name == 'Moon':
             phase = getattr(body, 'phase', 1.0)
             _render_moon_dynamic(dwg, body_group, sx, sy, pt, moon_angle_deg, phase)
@@ -179,7 +180,7 @@ def generate_stamp(
                 r=1.2 * pt, 
                 fill='white', 
                 stroke='black', 
-                stroke_width=0.4 * pt
+                stroke_width=W_REGULAR
             ))
         else:
             # Stars
@@ -188,14 +189,14 @@ def generate_stamp(
     
     dwg.save()
 
-def _render_sun(dwg, group, x, y, pt):
+def _render_sun(dwg, group, x, y, pt, stroke_w):
     """Ancient sun ☉"""
     group.add(dwg.circle(
         center=(x, y), 
         r=3.2 * pt, 
         fill='white', 
         stroke='black', 
-        stroke_width=0.8 * pt
+        stroke_width=stroke_w
     ))
     group.add(dwg.circle(center=(x, y), r=1.0 * pt, fill='black'))
 

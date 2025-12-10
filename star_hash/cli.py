@@ -28,14 +28,14 @@ def create(
     lon: Optional[float] = typer.Option(None, help="Longitude in degrees (default: auto-detect)"),
     time: Optional[datetime] = typer.Option(None, help="Date/Time (ISO format). Defaults to now."),
     output: Optional[str] = typer.Option(None, help="Output file path (default: Desktop with timestamp)"),
-    size: int = typer.Option(354, help="Size in pixels (default: 3cm at 300 DPI)"),
+    size: int = typer.Option(472, help="Size in pixels (default: 4cm at 300 DPI)"),
     debug: bool = typer.Option(False, help="Output projection data for verification")
 ):
     """
     Generates a Star Cipher stamp - a cryptic celestial hash of time and place.
     
     Output: SVG only (transparent background).
-    Default size: 3cm @ 300 DPI (354px).
+    Default size: 4cm @ 300 DPI (472px).
     """
     # Determine source of time
     time_source = "USER-PROVIDED"

@@ -67,7 +67,7 @@ timestamp --lat 40.7128 --lon -74.0060 --time "1969-07-20T20:17:00" --output apo
 ## Specification
 
 - **Format**: SVG (Vector)
-- **Size**: Reference 472px (4cm @ 300 DPI) or 354px (3cm @ 300 DPI).
+- **Size**: Default 472px (4cm @ 300 DPI). Scalable to any size.
 - **Geometry**:
     - **Border**: Exact 1pt stroke.
     - **Background**: Transparent.
