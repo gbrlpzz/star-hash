@@ -190,8 +190,9 @@ def generate_stamp(
                 stroke_width=W_REGULAR
             ))
         else:
-            # Stars
-            r = max(0.25, 1.1 - (body.mag * 0.2)) * pt
+            # Stars (Lighter / Proportional)
+            # Reduced base size and scaling factor for "lighter" look
+            r = max(0.2, 0.8 - (body.mag * 0.15)) * pt
             body_group.add(dwg.circle(center=(sx, sy), r=r, fill='black'))
     
     dwg.save()
