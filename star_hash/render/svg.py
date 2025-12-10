@@ -21,27 +21,20 @@ def generate_stamp(
     """
     ONE_POINT_PX = 300.0 / 72.0  # ~4.1667 px
     
-    # Visual Hierarchy (Simplified Two-Tone)
-    # User requested: "less variety", "thick and light", "both lighter than 1pt"
-    # Primary: Structural Elements (Horizon, Sun, Cardinals)
-    # Secondary: Data/Reference Elements (Planets, Grid, Ecliptic)
+    # Visual Hierarchy (Watermark / Ultra-Fine)
+    # User requested: "one step down", "watermark" aesthetic
+    # Primary: 0.5pt (Standard Fine)
+    # Secondary: 0.25pt (Hairline)
     
-    W_PRIMARY   = 0.75 * ONE_POINT_PX 
-    W_SECONDARY = 0.35 * ONE_POINT_PX
+    W_PRIMARY   = 0.5 * ONE_POINT_PX 
+    W_SECONDARY = 0.25 * ONE_POINT_PX
     
-    # Aliases for code readability (mapping logical roles to the two weights)
+    # Aliases
     W_HEAVY    = W_PRIMARY
     W_MEDIUM   = W_PRIMARY
     W_REGULAR  = W_SECONDARY
     W_FINE     = W_SECONDARY
-    W_HAIRLINE = W_SECONDARY  # Could go slightly thinner if grid needs to recede? 
-    # Let's keep it simple as requested: "two weights".
-    # usage:
-    # Horizon -> W_HEAVY (Primary)
-    # Sun, Ticks -> W_MEDIUM (Primary)
-    # Planets -> W_REGULAR (Secondary)
-    # Zenith -> W_FINE (Secondary)
-    # Grid -> W_HAIRLINE (Secondary)
+    W_HAIRLINE = W_SECONDARY
     
     # Border stroke width (Horizon)
     BORDER_WIDTH_PX = W_HEAVY
