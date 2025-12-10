@@ -21,13 +21,13 @@ def generate_stamp(
     """
     ONE_POINT_PX = 300.0 / 72.0  # ~4.1667 px
     
-    # Visual Hierarchy (Watermark / Ultra-Fine)
-    # User requested: "one step down", "watermark" aesthetic
-    # Primary: 0.5pt (Standard Fine)
-    # Secondary: 0.25pt (Hairline)
+    # Visual Hierarchy (Etherial / Ghost)
+    # User requested: "even lighter"
+    # Primary: 0.3pt (Fine)
+    # Secondary: 0.15pt (Hairline/Ghost)
     
-    W_PRIMARY   = 0.5 * ONE_POINT_PX 
-    W_SECONDARY = 0.25 * ONE_POINT_PX
+    W_PRIMARY   = 0.3 * ONE_POINT_PX 
+    W_SECONDARY = 0.15 * ONE_POINT_PX
     
     # Aliases
     W_HEAVY    = W_PRIMARY
