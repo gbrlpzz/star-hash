@@ -40,8 +40,8 @@ def create(
     # Determine source of time
     time_source = "USER-PROVIDED"
     if time is None:
-        time = datetime.now()
-        time_source = "SYSTEM CLOCK"
+        time = datetime.utcnow()
+        time_source = "SYSTEM CLOCK (UTC)"
         
     # Auto-detect location if needed
     loc_source = "USER-PROVIDED"
@@ -121,7 +121,11 @@ def create(
         sun_proj = next((b for b in projected if b.name == 'Sun'), None)
         moon_proj = next((b for b in projected if b.name == 'Moon'), None)
         if sun_proj:
-            typer.echo(f"Sun  : Projected (x={sun_proj.x:.4f}, y={sun_proj.y:.4f})")
+            r = (sun_proj.x**2 + sun_proj.y**2)**0.5
+            import math
+            z = 2 * math.atan(r)
+            alt_deg = 90 - math.degrees(z)
+            typer.echo(f"Sun  : Projected (x={sun_proj.x:.4f}, y={sun_proj.y:.4f}). Altitude: {alt_deg:.1f}°")
         else:
             typer.echo("Sun  : Below horizon")
         if moon_proj:
