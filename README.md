@@ -49,8 +49,8 @@ This projection preserves angular relationships and is conformal (locally angle-
 
 ### Visual Elements
 
-- **Outer border** (1pt): Horizon circle clipboundary
-- **Inner reference ring** (0.15pt, 50% opacity): 70% radius marker
+- **Outer border** (1pt): Horizon circle (0° Altitude)
+- **Inner reference ring** (0.15pt, 50% opacity): 20° Altitude marker (low sky reference)
 - **Local meridian** (dashed): North-south line through zenith
 - **Cardinal ticks**: N/S/E/W direction markers
 - **Ecliptic path** (0.15pt, 30% opacity): Sun's annual path through stars
