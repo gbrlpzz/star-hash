@@ -32,43 +32,47 @@ def create(
     debug: bool = typer.Option(False, help="Output projection data for verification")
 ):
     """
-    Generates a Star Cipher stamp - a cryptic celestial hash of time and place.
+    Generates a Star Hash - a cryptographic celestial timestamp of time and place.
     
-    Output: SVG only (transparent background).
-    Default size: 4cm @ 300 DPI (472px).
+    Output: SVG vector graphic (transparent background).
+    Default size: 3.86cm @ 300 DPI (456px).
     """
     # Determine source of time
     time_source = "USER-PROVIDED"
     if time is None:
         time = datetime.now()
-        time_source = "SYSTEM CLICK"
+        time_source = "SYSTEM CLOCK"
         
     # Auto-detect location if needed
     loc_source = "USER-PROVIDED"
     city_name = "Unknown"
     
     if lat is None or lon is None:
-        typer.echo("📍 Calculating coordinates from IP...")
+        typer.echo("Determining observer coordinates via IP geolocation...")
         lat, lon, city_name = get_current_location()
-        loc_source = "IP-Geolocation"
+        loc_source = "IP-GEOLOCATION"
 
-    # Precise logging
-    typer.echo("\n--- OBSERVER PARAMETERS ---")
-    typer.echo(f"Epoch (UTC): {time.isoformat()} (Source: {time_source})")
-    typer.echo(f"Location   : {city_name} [{lat:.4f}, {lon:.4f}] (Source: {loc_source})")
-    typer.echo("---------------------------\n")
+    # Echo observer parameters
+    typer.echo("")
+    typer.echo("=== OBSERVER PARAMETERS ===")
+    typer.echo(f"Epoch (UTC)  : {time.isoformat()}")
+    typer.echo(f"  Source     : {time_source}")
+    typer.echo(f"Location     : {city_name} [{lat:.4f}°, {lon:.4f}°]")
+    typer.echo(f"  Source     : {loc_source}")
+    typer.echo("===========================")
+    typer.echo("")
 
     # Determine output path
     if output is None:
         desktop = os.path.expanduser("~/Desktop")
         timestamp = time.strftime("%Y%m%d_%H%M")
         safe_city = "".join([c for c in city_name if c.isalnum() or c in (' ', '-', '_')]).strip().replace(' ', '_')
-        filename = f"cipher_{safe_city}_{timestamp}.svg"
+        filename = f"starhash_{safe_city}_{timestamp}.svg"
         output = os.path.join(desktop, filename)
     elif not output.endswith('.svg'):
         output += ".svg"
         
-    typer.echo(f"Calculating topocentric apparent positions (Epoch J2000 -> {time.date().isoformat()})...")
+    typer.echo(f"Computing ephemeris (J2000 → Epoch {time.date().isoformat()})...")
     
     # 1. Load stars with precession applied to target date
     star_bodies = get_stars_for_date(time)
@@ -81,7 +85,7 @@ def create(
     for p in planets:
         bodies.append((p.ra, p.dec, p.mag, p.name, 'planet'))
         
-    typer.echo(f"Catalog: {len(star_bodies)} stars, {len(planets)} planets.")
+    typer.echo(f"Loaded {len(star_bodies)} stars, {len(planets)} solar system bodies")
         
     # 3b. Generate Ecliptic (Solar Path)
     # Simulate Sun position for +/- 6 months to trace the ecliptic of date
@@ -103,32 +107,38 @@ def create(
         ecliptic_points.append((pos.ra, pos.dec, 0.0, 'ecliptic', 'ecliptic'))
         
     bodies.extend(ecliptic_points)
-    typer.echo(f"Ecliptic: {len(ecliptic_points)} reference points computed.")
+    typer.echo(f"Computed {len(ecliptic_points)} ecliptic reference points")
 
     # 4. Project
     projected = calculate_projection(bodies, lat, lon, time)
     visible_count = len(projected)
-    typer.echo(f"Stereographic Projection: Zenith-centered. Visible objects: {visible_count}")
+    typer.echo(f"Stereographic projection: {visible_count} bodies above horizon")
     
     # 5. Debug output for reverse-engineering verification
     if debug:
-        typer.echo("\n--- CALCULATION DATA ---")
+        typer.echo("")
+        typer.echo("=== PROJECTION DATA ===")
         sun_proj = next((b for b in projected if b.name == 'Sun'), None)
         moon_proj = next((b for b in projected if b.name == 'Moon'), None)
         if sun_proj:
-            typer.echo(f"Sun Altitude : x={sun_proj.x:.4f}, y={sun_proj.y:.4f}")
+            typer.echo(f"Sun  : Projected (x={sun_proj.x:.4f}, y={sun_proj.y:.4f})")
         else:
-            typer.echo("Sun Position : [Below Horizon]")
+            typer.echo("Sun  : Below horizon")
         if moon_proj:
-            typer.echo(f"Moon Altitude: x={moon_proj.x:.4f}, y={moon_proj.y:.4f}")
+            typer.echo(f"Moon : Projected (x={moon_proj.x:.4f}, y={moon_proj.y:.4f})")
         else:
-            typer.echo("Moon Position: [Below Horizon]")
-        typer.echo(f"Star Count   : {len([b for b in projected if b.type == 'star'])}")
+            typer.echo("Moon : Below horizon")
+        typer.echo(f"Stars: {len([b for b in projected if b.type == 'star'])} visible")
+        typer.echo("=======================")
+        typer.echo("")
     
     # 6. Render
     generate_stamp(projected, output, None, size)
     
-    typer.echo(f"Cipher generation complete. Artifact written to: {output}")
+    
+    typer.echo("")
+    typer.echo(f"Output written: {output}")
+    typer.echo("")
 
 if __name__ == "__main__":
     app()
