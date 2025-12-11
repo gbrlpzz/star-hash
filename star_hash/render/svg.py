@@ -163,7 +163,6 @@ def generate_stamp(
             fill='none',
             stroke='black',
             stroke_width=W_HAIRLINE,
-            stroke_dasharray=f"{ONE_POINT_PX*scale},{ONE_POINT_PX*scale*2}",
             opacity=0.6
         ))
 
