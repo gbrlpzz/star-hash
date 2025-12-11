@@ -28,7 +28,7 @@ def create(
     lon: Optional[float] = typer.Option(None, help="Longitude in degrees (default: auto-detect)"),
     time: Optional[datetime] = typer.Option(None, help="Date/Time (ISO format). Defaults to now."),
     output: Optional[str] = typer.Option(None, help="Output file path (default: Desktop with timestamp)"),
-    size: int = typer.Option(472, help="Size in pixels (default: 4cm at 300 DPI)"),
+    size: int = typer.Option(456, help="Size in pixels (default: 3.86cm at 300 DPI)"),
     debug: bool = typer.Option(False, help="Output projection data for verification")
 ):
     """

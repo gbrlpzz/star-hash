@@ -60,10 +60,9 @@ def calculate_projection(
         sin_alt = max(-1.0, min(1.0, sin_alt))
         alt_rad = math.asin(sin_alt)
         
-        # Always include Sun and Moon regardless of altitude calculations,
-        # but for others skip if below horizon.
-        # ALSO: Include 'ecliptic' points to allow drawing the full path (clipped by SVG later)
-        is_key_body = name == 'Sun' or btype == 'ecliptic'
+        # Sun and Moon always included (Moon rendered as backmost layer)
+        # Ecliptic points included for drawing full annual path
+        is_key_body = name in ('Sun', 'Moon') or btype == 'ecliptic'
         
         if alt_rad < 0 and not is_key_body:
             continue

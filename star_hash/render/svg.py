@@ -167,8 +167,20 @@ def generate_stamp(
             opacity=0.6
         ))
 
+    
+    # Render Moon FIRST (backmost layer) to prevent covering other objects
+    moon_bodies = [b for b in projected_visible if b.name == 'Moon']
+    if moon_bodies:
+        moon = moon_bodies[0]
+        sx = center + moon.x * radius_path
+        sy = center + moon.y * radius_path
+        pt = ONE_POINT_PX * scale
+        phase = getattr(moon, 'phase', 1.0)
+        _render_moon_dynamic(dwg, body_group, sx, sy, pt, moon_angle_deg, phase)
+    
+    # Then render all other bodies (stars, planets, Sun)
     for body in projected_visible:
-        if body.type == 'ecliptic':
+        if body.type == 'ecliptic' or body.name == 'Moon':
             continue
 
         sx = center + body.x * radius_path
@@ -177,9 +189,6 @@ def generate_stamp(
         
         if body.name == 'Sun':
             _render_sun(dwg, body_group, sx, sy, pt, W_MEDIUM)
-        elif body.name == 'Moon':
-            phase = getattr(body, 'phase', 1.0)
-            _render_moon_dynamic(dwg, body_group, sx, sy, pt, moon_angle_deg, phase)
         elif body.type == 'planet':
             # Planet (magnitude-based sizing)
             planet_r = max(0.8, 1.5 - (body.mag * 0.15)) * pt
