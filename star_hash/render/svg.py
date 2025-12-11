@@ -7,7 +7,7 @@ def generate_stamp(
     bodies: List[ProjectedBody],
     output_path: str,
     metadata_text: str = None,
-    size: int = 472  # Default: 4cm at 300 DPI (~472.44px)
+    size: int = 456  # Default: 3.86cm at 300 DPI (~456px)
 ):
     """
     Generates a cryptic celestial cipher stamp.
@@ -181,18 +181,18 @@ def generate_stamp(
             phase = getattr(body, 'phase', 1.0)
             _render_moon_dynamic(dwg, body_group, sx, sy, pt, moon_angle_deg, phase)
         elif body.type == 'planet':
-            # Planet
+            # Planet (magnitude-based sizing)
+            planet_r = max(0.8, 1.5 - (body.mag * 0.15)) * pt
             body_group.add(dwg.circle(
                 center=(sx, sy), 
-                r=1.2 * pt, 
+                r=planet_r, 
                 fill='white', 
                 stroke='black', 
                 stroke_width=W_REGULAR
             ))
         else:
-            # Stars (Lighter / Proportional)
-            # Reduced base size and scaling factor for "lighter" look
-            r = max(0.2, 0.8 - (body.mag * 0.15)) * pt
+            # Stars (Enhanced hierarchy)
+            r = max(0.2, 0.65 - (body.mag * 0.12)) * pt
             body_group.add(dwg.circle(center=(sx, sy), r=r, fill='black'))
     
     dwg.save()
@@ -220,8 +220,8 @@ def _render_moon_dynamic(dwg, group, x, y, pt, angle_deg, phase):
     # center is (x,y)
     g = dwg.g(transform=f"rotate({angle_deg}, {x}, {y})")
     
-    # 1. Base Disk (Black)
-    r_moon = 2.8 * pt
+    # 1. Base Disk (Black - reduced size)
+    r_moon = 1.5 * pt  # 6.25px at default scale
     g.add(dwg.circle(center=(x, y), r=r_moon, fill='black'))
     
     # 2. Masking (White) to create Crescent
