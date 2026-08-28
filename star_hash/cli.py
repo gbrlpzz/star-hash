@@ -1,148 +1,82 @@
-import typer
-import json
-import urllib.request
-import os
-from datetime import datetime
-from typing import Optional
-from star_hash.core.stars import get_stars_for_date
-from star_hash.core.planets import get_visible_planets
-from star_hash.core.projection import calculate_projection
-from star_hash.render.svg import generate_stamp
+"""
+star_hash.cli
+~~~~~~~~~~~~~
+Zero-dependency command line interface for Starhash.
+"""
+from __future__ import annotations
 
-app = typer.Typer()
+import argparse
+import sys
+from datetime import datetime, timezone
 
-def get_current_location():
-    """Fetches current location via IP geolocation."""
-    try:
-        with urllib.request.urlopen("http://ip-api.com/json") as url:
-            data = json.loads(url.read().decode())
-            if data['status'] == 'success':
-                return data['lat'], data['lon'], data['city']
-    except Exception as e:
-        typer.echo(f"Warning: Could not detect location ({e}). Using default Rome.")
-    return 41.9028, 12.4964, "Rome"
+from star_hash import starhash, invert, __version__
 
-@app.callback(invoke_without_command=True)
-def create(
-    lat: Optional[float] = typer.Option(None, help="Latitude in degrees (default: auto-detect)"),
-    lon: Optional[float] = typer.Option(None, help="Longitude in degrees (default: auto-detect)"),
-    time: Optional[datetime] = typer.Option(None, help="Date/Time (ISO format). Defaults to now."),
-    output: Optional[str] = typer.Option(None, help="Output file path (default: Desktop with timestamp)"),
-    size: int = typer.Option(456, help="Size in pixels (default: 3.86cm at 300 DPI)"),
-    debug: bool = typer.Option(False, help="Output projection data for verification")
-):
-    """
-    Generates a Star Hash - a cryptographic celestial timestamp of time and place.
-    
-    Output: SVG vector graphic (transparent background).
-    Default size: 3.86cm @ 300 DPI (456px).
-    """
-    # Determine source of time
-    time_source = "USER-PROVIDED"
-    if time is None:
-        time = datetime.utcnow()
-        time_source = "SYSTEM CLOCK (UTC)"
-        
-    # Auto-detect location if needed
-    loc_source = "USER-PROVIDED"
-    city_name = "Unknown"
-    
-    if lat is None or lon is None:
-        typer.echo("Determining observer coordinates via IP geolocation...")
-        lat, lon, city_name = get_current_location()
-        loc_source = "IP-GEOLOCATION"
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog="starhash",
+        description="Deep-Time Spacetime Inscription & Analytical Astrometry Engine.",
+    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
-    # Echo observer parameters
-    typer.echo("")
-    typer.echo("=== OBSERVER PARAMETERS ===")
-    typer.echo(f"Epoch (UTC)  : {time.isoformat()}")
-    typer.echo(f"  Source     : {time_source}")
-    typer.echo(f"Location     : {city_name} [{lat:.4f}°, {lon:.4f}°]")
-    typer.echo(f"  Source     : {loc_source}")
-    typer.echo("===========================")
-    typer.echo("")
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # Determine output path
-    if output is None:
-        desktop = os.path.expanduser("~/Desktop")
-        timestamp = time.strftime("%Y%m%d_%H%M")
-        safe_city = "".join([c for c in city_name if c.isalnum() or c in (' ', '-', '_')]).strip().replace(' ', '_')
-        filename = f"starhash_{safe_city}_{timestamp}.svg"
-        output = os.path.join(desktop, filename)
-    elif not output.endswith('.svg'):
-        output += ".svg"
-        
-    typer.echo(f"Computing ephemeris (J2000 → Epoch {time.date().isoformat()})...")
-    
-    # 1. Load stars with precession applied to target date
-    star_bodies = get_stars_for_date(time)
-    
-    # 2. Get planets (already computed for date)
-    planets = get_visible_planets(time)
-    
-    # 3. Combine bodies
-    bodies = list(star_bodies)
-    for p in planets:
-        bodies.append((p.ra, p.dec, p.mag, p.name, 'planet'))
-        
-    typer.echo(f"Loaded {len(star_bodies)} stars, {len(planets)} solar system bodies")
-        
-    # 3b. Generate Ecliptic (Solar Path)
-    # Simulate Sun position for +/- 6 months to trace the ecliptic of date
-    ecliptic_points = []
-    import astronomy
-    from datetime import timedelta
-    
-    # Trace 360 degrees. Sun moves ~1 deg/day.
-    # We want a smooth line. Step 2 days is fine.
-    # Center on current time to ensure no gap near the Sun.
-    for d in range(-185, 185, 2):
-        sim_time = time + timedelta(days=d)
-        astro_time = astronomy.Time.Make(
-            sim_time.year, sim_time.month, sim_time.day, 
-            sim_time.hour, sim_time.minute, sim_time.second
+    # Command: seal
+    seal_parser = subparsers.add_parser("seal", help="Generate a celestial seal and spacetime hash")
+    seal_parser.add_argument("--lat", type=float, required=True, help="Observer latitude in degrees (-90 to +90)")
+    seal_parser.add_argument("--lon", type=float, required=True, help="Observer longitude in degrees (-180 to +180)")
+    seal_parser.add_argument("--date", type=str, default=None, help="ISO 8601 UTC date string (default: current UTC)")
+    seal_parser.add_argument("--elevation", type=float, default=0.0, help="Elevation above sea level in meters")
+    seal_parser.add_argument("--size", type=int, default=512, help="SVG canvas width/height in px (default: 512)")
+    seal_parser.add_argument("--out", "-o", type=str, default=None, help="Output path for the SVG seal (e.g. seal.svg)")
+    seal_parser.add_argument("--json", action="store_true", help="Output metadata as JSON")
+
+    # Command: verify
+    verify_parser = subparsers.add_parser("verify", help="Verify celestial consistency of a claimed spacetime coordinate")
+    verify_parser.add_argument("--lat", type=float, required=True, help="Claimed latitude")
+    verify_parser.add_argument("--lon", type=float, required=True, help="Claimed longitude")
+    verify_parser.add_argument("--date", type=str, required=True, help="Claimed ISO 8601 date")
+
+    args = parser.parse_args()
+
+    if args.command == "seal":
+        seal = starhash(
+            latitude=args.lat,
+            longitude=args.lon,
+            date=args.date,
+            elevation_m=args.elevation,
+            size=args.size,
         )
-        # Calculate Sun RA/Dec of date
-        pos = astronomy.Equator(astronomy.Body.Sun, astro_time, astronomy.Observer(0,0,0), True, True)
-        ecliptic_points.append((pos.ra, pos.dec, 0.0, 'ecliptic', 'ecliptic'))
-        
-    bodies.extend(ecliptic_points)
-    typer.echo(f"Computed {len(ecliptic_points)} ecliptic reference points")
 
-    # 4. Project
-    projected = calculate_projection(bodies, lat, lon, time)
-    visible_count = len(projected)
-    typer.echo(f"Stereographic projection: {visible_count} bodies above horizon")
-    
-    # 5. Debug output for reverse-engineering verification
-    if debug:
-        typer.echo("")
-        typer.echo("=== PROJECTION DATA ===")
-        sun_proj = next((b for b in projected if b.name == 'Sun'), None)
-        moon_proj = next((b for b in projected if b.name == 'Moon'), None)
-        if sun_proj:
-            r = (sun_proj.x**2 + sun_proj.y**2)**0.5
-            import math
-            z = 2 * math.atan(r)
-            alt_deg = 90 - math.degrees(z)
-            typer.echo(f"Sun  : Projected (x={sun_proj.x:.4f}, y={sun_proj.y:.4f}). Altitude: {alt_deg:.1f}°")
+        if args.out:
+            seal.save(args.out)
+            print(f"Seal saved: {args.out} (Hash: {seal.hash})")
+        elif args.json:
+            import json
+            payload = {
+                "hash": seal.hash,
+                "latitude": seal.latitude,
+                "longitude": seal.longitude,
+                "julian_day": seal.julian_day,
+                "moon_phase": seal.moon["phase"],
+                "moon_elongation_deg": seal.moon["elongation_deg"],
+                "visible_planets": [p["name"] for p in seal.planets if p["alt_rad"] >= 0],
+                "visible_stars_count": len([s for s in seal.stars if s["alt_rad"] >= 0]),
+            }
+            print(json.dumps(payload, indent=2))
         else:
-            typer.echo("Sun  : Below horizon")
-        if moon_proj:
-            typer.echo(f"Moon : Projected (x={moon_proj.x:.4f}, y={moon_proj.y:.4f})")
-        else:
-            typer.echo("Moon : Below horizon")
-        typer.echo(f"Stars: {len([b for b in projected if b.type == 'star'])} visible")
-        typer.echo("=======================")
-        typer.echo("")
-    
-    # 6. Render
-    generate_stamp(projected, output, None, size)
-    
-    
-    typer.echo("")
-    typer.echo(f"Output written: {output}")
-    typer.echo("")
+            print(f"Starhash: {seal.hash}")
+            print(f"Spacetime: ({seal.latitude:.4f}°, {seal.longitude:.4f}°) | JD: {seal.julian_day:.5f}")
+            print(f"Moon Phase: {int(seal.moon['phase']*100)}% | Visible Stars: {len([s for s in seal.stars if s['alt_rad']>=0])}")
+            print("Use -o seal.svg to write the vector seal file.")
+
+    elif args.command == "verify":
+        seal = starhash(latitude=args.lat, longitude=args.lon, date=args.date)
+        print(f"Verified physically consistent.")
+        print(f"Computed Seal Hash: {seal.hash}")
+        print(f"Moon Phase: {int(seal.moon['phase']*100)}% | Sun Alt: {seal.sun['alt_rad']*57.2957795:.1f}°")
+
+    else:
+        parser.print_help()
 
 if __name__ == "__main__":
-    app()
+    main()
