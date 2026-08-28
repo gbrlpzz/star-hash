@@ -1,8 +1,9 @@
 """
 star_hash.render
 ~~~~~~~~~~~~~~~~
-Zero-dependency, pure-string SVG vector seal generator for Starhash ciphers.
-Produces museum-grade conformal astrolabe celestial seals.
+High-elegance monochrome vector seal generator for Starhash spacetime ciphers.
+Implements crisp architectural engraving aesthetics, alchemical planetary symbols,
+and conformal stereographic astrolabe geometry.
 """
 from __future__ import annotations
 
@@ -12,65 +13,107 @@ from typing import List, Dict, Any
 from star_hash.ephemeris import RAD, DEG, TWO_PI
 from star_hash.projection import stereographic_project
 
+# Classical Astronomical / Alchemical Symbols for the wandering bodies
+ALCHEMICAL_SYMBOLS = {
+    "Sun": "\u2609",      # ☉ Circumpunct
+    "Moon": "\u263D",     # ☽ First Quarter / Crescent
+    "Mercury": "\u263F",  # ☿ Caduceus
+    "Venus": "\u2640",    # ♀ Ankh
+    "Mars": "\u2642",     # ♂ Shield & Spear
+    "Jupiter": "\u2643",  # ♃ Zeta / Lightning
+    "Saturn": "\u2644",   # ♄ Sickle / Scythe
+}
+
 def generate_svg_seal(
     stars: List[Dict[str, Any]],
     planets: List[Dict[str, Any]],
     moon: Dict[str, Any] | None,
     sun: Dict[str, Any] | None,
     hash_label: str = "STARHASH-CIPHER",
-    size: int = 512,
+    size: int = 456,
     horizon_cutoff: bool = True,
 ) -> str:
     """
-    Renders a complete conformal celestial seal as a standalone SVG string.
+    Renders a high-precision monochrome vector seal.
     Zero external dependencies.
     """
-    center = size / 2.0
-    radius = (size / 2.0) - 28.0  # Outer horizon radius in px
+    scale = size / 456.0
+    pt = (300.0 / 72.0) * scale  # Base point scale factor (~4.167px at 300DPI)
 
-    # Base SVG setup with embedded styles and filters
+    # Stroke hierarchy (fine letterpress / engraving weights)
+    w_heavy = 0.30 * pt      # Outer horizon border (~1.25px)
+    w_hairline = 0.15 * pt   # Secondary grid lines & axes (~0.62px)
+
+    center = size / 2.0
+    radius = (size / 2.0) - (w_heavy / 2.0) - (4.0 * scale)
+    inner_alt_radius = radius * 0.70  # 20-degree altitude boundary
+
     svg = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" width="{size}" height="{size}" role="img" aria-label="Celestial Spacetime Seal">',
         '  <defs>',
-        '    <radialGradient id="sh-sky" cx="50%" cy="50%" r="50%">',
-        '      <stop offset="0%" stop-color="#0a0c12" stop-opacity="1" />',
-        '      <stop offset="65%" stop-color="#050608" stop-opacity="1" />',
-        '      <stop offset="100%" stop-color="#000000" stop-opacity="1" />',
-        '    </radialGradient>',
-        '    <filter id="sh-glow" x="-50%" y="-50%" width="200%" height="200%">',
-        '      <feGaussianBlur in="SourceGraphic" stdDeviation="1.0" result="blur" />',
-        '      <feMerge>',
-        '        <feMergeNode in="blur" />',
-        '        <feMergeNode in="SourceGraphic" />',
-        '      </feMerge>',
-        '    </filter>',
+        f'    <clipPath id="horizon_clip">',
+        f'      <circle cx="{center}" cy="{center}" r="{radius:.2f}" />',
+        '    </clipPath>',
         '  </defs>',
-        f'  <rect width="{size}" height="{size}" fill="#000000" />',
-        f'  <circle cx="{center}" cy="{center}" r="{radius:.1f}" fill="url(#sh-sky)" stroke="#272b38" stroke-width="1.2" />',
+        # Clean white background
+        f'  <rect width="{size}" height="{size}" fill="#ffffff" />',
+        # Outer Horizon Ring
+        f'  <circle cx="{center}" cy="{center}" r="{radius:.2f}" fill="none" stroke="#000000" stroke-width="{w_heavy:.2f}" shape-rendering="geometricPrecision" />',
+        # Inner Altitude Ring (20-degree altitude boundary)
+        f'  <circle cx="{center}" cy="{center}" r="{inner_alt_radius:.2f}" fill="none" stroke="#000000" stroke-width="{w_hairline:.2f}" opacity="0.45" />',
+        # Zenith Crosshair
+        f'  <line x1="{center - 3.5*scale:.2f}" y1="{center:.2f}" x2="{center + 3.5*scale:.2f}" y2="{center:.2f}" stroke="#000000" stroke-width="{w_hairline:.2f}" />',
+        f'  <line x1="{center:.2f}" y1="{center - 3.5*scale:.2f}" x2="{center:.2f}" y2="{center + 3.5*scale:.2f}" stroke="#000000" stroke-width="{w_hairline:.2f}" />',
+        # North-South Meridian Line (dashed)
+        f'  <line x1="{center:.2f}" y1="{center - radius:.2f}" x2="{center:.2f}" y2="{center + radius:.2f}" stroke="#000000" stroke-width="{w_hairline:.2f}" stroke-dasharray="{2.0*scale:.2f},{8.0*scale:.2f}" opacity="0.4" />',
     ]
 
-    # Altitude rings (30 deg and 60 deg above horizon)
-    # r(30 deg) = tan(30/2 deg) = 0.57735
-    # r(60 deg) = tan(15 deg)   = 0.26795
-    r_30 = radius * 0.57735
-    r_60 = radius * 0.26795
-    svg.append(f'  <circle cx="{center}" cy="{center}" r="{r_30:.2f}" fill="none" stroke="#161a24" stroke-width="0.8" stroke-dasharray="2 3" />')
-    svg.append(f'  <circle cx="{center}" cy="{center}" r="{r_60:.2f}" fill="none" stroke="#161a24" stroke-width="0.8" stroke-dasharray="2 3" />')
+    # Cardinal Ticks (N, E, S, W pointing inward)
+    tick_len = 6.0 * scale
+    cardinals = [
+        (center, center - radius, 0, 1),       # North (top)
+        (center + radius, center, -1, 0),      # East (right)
+        (center, center + radius, 0, -1),      # South (bottom)
+        (center - radius, center, 1, 0),       # West (left)
+    ]
+    for cx, cy, dx, dy in cardinals:
+        x2 = cx + dx * tick_len
+        y2 = cy + dy * tick_len
+        svg.append(f'  <line x1="{cx:.2f}" y1="{cy:.2f}" x2="{x2:.2f}" y2="{y2:.2f}" stroke="#000000" stroke-width="{w_heavy:.2f}" />')
 
-    # Meridian and Prime Vertical Axes
-    svg.append(f'  <line x1="{center}" y1="{center - radius}" x2="{center}" y2="{center + radius}" stroke="#161a24" stroke-width="0.8" />')
-    svg.append(f'  <line x1="{center - radius}" y1="{center}" x2="{center + radius}" y2="{center}" stroke="#161a24" stroke-width="0.8" />')
-    svg.append(f'  <circle cx="{center}" cy="{center}" r="2" fill="#2d3345" />')
+    # Bodies Group inside horizon clip
+    svg.append('  <g clip-path="url(#horizon_clip)">')
 
-    # Cardinal markers
-    svg.append(f'  <text x="{center}" y="{center - radius - 8:.1f}" fill="#64748b" font-family="ui-monospace, monospace" font-size="9" font-weight="600" text-anchor="middle">N</text>')
-    svg.append(f'  <text x="{center + radius + 11:.1f}" y="{center + 3.5:.1f}" fill="#64748b" font-family="ui-monospace, monospace" font-size="9" font-weight="600" text-anchor="middle">E</text>')
-    svg.append(f'  <text x="{center}" y="{center + radius + 16:.1f}" fill="#64748b" font-family="ui-monospace, monospace" font-size="9" font-weight="600" text-anchor="middle">S</text>')
-    svg.append(f'  <text x="{center - radius - 11:.1f}" y="{center + 3.5:.1f}" fill="#64748b" font-family="ui-monospace, monospace" font-size="9" font-weight="600" text-anchor="middle">W</text>')
+    # 1. Render Moon (Geometric Crescent with Solar Vector Alignment)
+    if moon and (not horizon_cutoff or moon.get("alt_rad", -1.0) >= -0.01):
+        alt = moon["alt_rad"]
+        az = moon["az_rad"]
+        x_proj, y_proj, r_proj = stereographic_project(alt, az)
+        if not (horizon_cutoff and r_proj > 1.02):
+            mx = center + radius * x_proj
+            my = center + radius * y_proj
+            phase = moon.get("phase", 1.0)
+            limb_angle = moon.get("limb_angle_rad", 0.0)
+            r_moon = 6.2 * scale
 
-    # 1. Render Visible Stars
-    svg.append('  <!-- Navigational Stars -->')
-    svg.append('  <g id="stars">')
+            # Rotate crescent to face the Sun
+            rot_deg = limb_angle * DEG + 90.0
+            svg.append(f'    <!-- Moon (Phase: {int(phase*100)}%) -->')
+            svg.append(f'    <g id="moon" transform="rotate({rot_deg:.2f}, {mx:.2f}, {my:.2f})">')
+            # Base black disk
+            svg.append(f'      <circle cx="{mx:.2f}" cy="{my:.2f}" r="{r_moon:.2f}" fill="#000000" />')
+            if phase < 0.98 and phase > 0.02:
+                # White crescent mask
+                w = r_moon * (2.0 * phase - 1.0)
+                sweep_inner = 1 if phase > 0.5 else 0
+                path_d = f"M {mx:.2f} {my - r_moon:.2f} A {r_moon:.2f} {r_moon:.2f} 0 0 1 {mx:.2f} {my + r_moon:.2f} A {abs(w):.2f} {r_moon:.2f} 0 0 {sweep_inner} {mx:.2f} {my - r_moon:.2f} Z"
+                svg.append(f'      <path d="{path_d}" fill="#ffffff" />')
+            elif phase <= 0.02:
+                svg.append(f'      <circle cx="{mx:.2f}" cy="{my:.2f}" r="{r_moon*0.95:.2f}" fill="#ffffff" />')
+            svg.append('    </g>')
+
+    # 2. Render Stars (Proportional Hierarchical Sizing)
+    svg.append('    <g id="stars">')
     for s in stars:
         alt = s["alt_rad"]
         az = s["az_rad"]
@@ -80,22 +123,31 @@ def generate_svg_seal(
         if horizon_cutoff and r_proj > 1.02:
             continue
 
-        px = center + radius * x_proj
-        py = center + radius * y_proj
-
+        sx = center + radius * x_proj
+        sy = center + radius * y_proj
         mag = s.get("mag", 2.0)
-        dot_r = max(0.6, min(3.4, 3.2 - 0.55 * mag))
-        opacity = max(0.25, min(1.0, 1.0 - 0.16 * max(0.0, mag + 1.0)))
+        # Scaled dot radius
+        r_star = max(0.45 * scale, (0.65 - (mag * 0.12)) * pt)
+        svg.append(f'      <circle cx="{sx:.2f}" cy="{sy:.2f}" r="{r_star:.2f}" fill="#000000" />')
+    svg.append('    </g>')
 
-        if mag <= 1.4:
-            svg.append(f'    <circle cx="{px:.2f}" cy="{py:.2f}" r="{dot_r:.2f}" fill="#ffffff" opacity="{opacity:.2f}" filter="url(#sh-glow)" />')
-        else:
-            svg.append(f'    <circle cx="{px:.2f}" cy="{py:.2f}" r="{dot_r:.2f}" fill="#cbd5e1" opacity="{opacity:.2f}" />')
-    svg.append('  </g>')
+    # 3. Render Sun (Classical Circumpunct ☉)
+    if sun and (not horizon_cutoff or sun.get("alt_rad", -1.0) >= -0.01):
+        alt = sun["alt_rad"]
+        az = sun["az_rad"]
+        x_proj, y_proj, r_proj = stereographic_project(alt, az)
+        if not (horizon_cutoff and r_proj > 1.02):
+            sx = center + radius * x_proj
+            sy = center + radius * y_proj
+            r_sun_outer = 3.2 * pt
+            r_sun_inner = 1.0 * pt
+            svg.append('    <g id="sun">')
+            svg.append(f'      <circle cx="{sx:.2f}" cy="{sy:.2f}" r="{r_sun_outer:.2f}" fill="#ffffff" stroke="#000000" stroke-width="{w_heavy:.2f}" />')
+            svg.append(f'      <circle cx="{sx:.2f}" cy="{sy:.2f}" r="{r_sun_inner:.2f}" fill="#000000" />')
+            svg.append('    </g>')
 
-    # 2. Render Planets
-    svg.append('  <!-- Planets -->')
-    svg.append('  <g id="planets">')
+    # 4. Render Planets (With Classical Alchemical / Astrological Glyphs)
+    svg.append('    <g id="planets">')
     for p in planets:
         alt = p["alt_rad"]
         az = p["az_rad"]
@@ -107,61 +159,20 @@ def generate_svg_seal(
 
         px = center + radius * x_proj
         py = center + radius * y_proj
-
         name = p["name"]
-        color = "#e2b358" if name in ["Venus", "Jupiter", "Saturn"] else ("#f87171" if name == "Mars" else "#cbd5e1")
-        svg.append(f'    <!-- {name} -->')
-        svg.append(f'    <circle cx="{px:.2f}" cy="{py:.2f}" r="4.5" fill="none" stroke="{color}" stroke-width="1.0" />')
-        svg.append(f'    <circle cx="{px:.2f}" cy="{py:.2f}" r="1.8" fill="{color}" />')
-        svg.append(f'    <text x="{px + 6.5:.2f}" y="{py + 3.0:.2f}" fill="{color}" font-family="ui-monospace, monospace" font-size="8" font-weight="500" letter-spacing="0.04em">{name}</text>')
+        mag = p.get("mag", 0.0)
+        planet_r = max(0.8, 1.5 - (mag * 0.15)) * pt
+        symbol = ALCHEMICAL_SYMBOLS.get(name, "")
+
+        svg.append(f'      <!-- {name} {symbol} -->')
+        svg.append(f'      <circle cx="{px:.2f}" cy="{py:.2f}" r="{planet_r:.2f}" fill="#ffffff" stroke="#000000" stroke-width="{w_hairline:.2f}" />')
+        svg.append(f'      <text x="{px + planet_r + 2.5*scale:.2f}" y="{py + 3.5*scale:.2f}" fill="#000000" font-family="system-ui, -apple-system, sans-serif" font-size="{10.0*scale:.1f}" font-weight="500">{symbol}</text>')
+    svg.append('    </g>')
+
     svg.append('  </g>')
 
-    # 3. Render Moon with True Geometrical Crescent
-    if moon is not None and (not horizon_cutoff or moon.get("alt_rad", -1.0) >= -0.01):
-        alt = moon["alt_rad"]
-        az = moon["az_rad"]
-        x_proj, y_proj, r_proj = stereographic_project(alt, az)
-        if not (horizon_cutoff and r_proj > 1.02):
-            px = center + radius * x_proj
-            py = center + radius * y_proj
-            phase = moon["phase"]  # 0.0 to 1.0
-            limb_angle = moon.get("limb_angle_rad", 0.0)
-            moon_r = 7.5
-
-            svg.append('  <!-- Moon -->')
-            svg.append(f'  <g id="moon" transform="translate({px:.2f}, {py:.2f})">')
-            svg.append(f'    <circle cx="0" cy="0" r="{moon_r}" fill="#161b26" stroke="#475569" stroke-width="0.8" />')
-
-            rot_deg = limb_angle * DEG + 90.0
-            svg.append(f'    <g transform="rotate({rot_deg:.1f})">')
-            if phase >= 0.98:
-                svg.append(f'      <circle cx="0" cy="0" r="{moon_r}" fill="#f8fafc" />')
-            elif phase > 0.02:
-                w = moon_r * (2.0 * phase - 1.0)
-                sweep_inner = 1 if phase > 0.5 else 0
-                path_d = f"M 0 {-moon_r} A {moon_r} {moon_r} 0 0 1 0 {moon_r} A {abs(w):.2f} {moon_r} 0 0 {sweep_inner} 0 {-moon_r} Z"
-                svg.append(f'      <path d="{path_d}" fill="#f8fafc" />')
-            svg.append('    </g>')
-            svg.append(f'    <text x="10" y="3" fill="#94a3b8" font-family="ui-monospace, monospace" font-size="8">Moon {int(phase * 100)}%</text>')
-            svg.append('  </g>')
-
-    # 4. Outer Rim Hash & Minute Divisions
-    svg.append('  <!-- Astrolabe Rim Divisions -->')
-    for tick in range(72):
-        angle = tick * (TWO_PI / 72.0)
-        is_major = tick % 6 == 0
-        r_in = radius if is_major else radius + 2.0
-        r_out = radius + (7.0 if is_major else 4.0)
-        x1 = center + r_in * math.sin(angle)
-        y1 = center - r_in * math.cos(angle)
-        x2 = center + r_out * math.sin(angle)
-        y2 = center - r_out * math.cos(angle)
-        stroke_c = "#475569" if is_major else "#262f3f"
-        stroke_w = 1.0 if is_major else 0.6
-        svg.append(f'  <line x1="{x1:.2f}" y1="{y1:.2f}" x2="{x2:.2f}" y2="{y2:.2f}" stroke="{stroke_c}" stroke-width="{stroke_w}" />')
-
-    # 5. Metadata Legend / Hash Stamp
-    svg.append(f'  <text x="{center}" y="{size - 9:.1f}" fill="#64748b" font-family="ui-monospace, monospace" font-size="8.5" text-anchor="middle" letter-spacing="0.12em">{hash_label}</text>')
+    # 5. Outer Bottom Stamp Hash Label (Subtle, Monochrome)
+    svg.append(f'  <text x="{center:.2f}" y="{size - 4.0*scale:.2f}" fill="#71717a" font-family="ui-monospace, SFMono-Regular, monospace" font-size="{7.5*scale:.1f}" text-anchor="middle" letter-spacing="0.10em">{hash_label}</text>')
     svg.append('</svg>')
 
     return "\n".join(svg)
