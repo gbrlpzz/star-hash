@@ -178,6 +178,8 @@ def starhash(
         planets=planets,
         moon=moon,
         sun=sun,
+        last_rad=last_rad,
+        lat_rad=lat_rad,
         hash_label=seal_hash,
         size=size,
         horizon_cutoff=horizon_cutoff,
