@@ -1,0 +1,230 @@
+\documentclass[10pt,twocolumn,a4paper]{article}
+
+\usepackage[margin=0.8in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage[numbers]{natbib}
+\usepackage[colorlinks=true,allcolors=black]{hyperref}
+
+\title{\textbf{Starhash: A Time-and-Place Seal Written as the Sky}}
+\author{Gabriele Pizzi\\
+\textit{ETH Z\"urich} \quad$\cdot$\quad \textit{Liminal}\\
+\texttt{info@gabrielepizzi.com}}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent Starhash draws the sky over a stated place at a stated moment and
+uses the drawing as a seal for a document. The sky carries the place and the
+time; a ring of ticks around the horizon carries the first 128 bits of the
+document's SHA-256. The seal holds no text and no hidden record. A reader
+recovers latitude, longitude and time from the geometry alone by identifying
+the stars and using the Moon, Sun and planets as clock hands. With the Moon
+above the horizon the time is recovered to seconds; with no Moon, Sun or
+planet above the horizon it cannot be recovered at all. The model is small
+and approximate, and a seal records a claim rather than proving it. This note
+describes the model, the seal, the reader and their limits.
+\end{abstract}
+
+\section{Idea}
+
+A date and a pair of coordinates depend on conventions: a calendar, an epoch,
+a prime meridian. The sky over a place at a moment depends on much less. It
+can be drawn, and from the drawing the place and moment can be worked out
+again by anyone who knows the stars. Starhash is a small program built on
+that observation. It has three operations: \emph{sign} draws a seal for a
+file, \emph{read} recovers place and time from a seal, and \emph{verify}
+checks a seal against a file. It is written in Python with no dependencies.
+
+\section{Model}
+
+The model is deliberately compact. Its ingredients are standard
+\cite{meeus1998astronomical}.
+
+\paragraph{Time.} Dates are converted to Julian Day in the proleptic
+Gregorian calendar, and $T=(\mathit{JD}-2451545)/36525$. UTC is used
+directly as the time argument. Local sidereal time is the mean sidereal
+time polynomial at Greenwich plus the east longitude $\lambda$:
+\begin{equation}
+\theta = 280.46061837^\circ + 360.98564736629^\circ\,d + \lambda ,
+\end{equation}
+with $d=\mathit{JD}-2451545$ and two small terms in $T^2$ and $T^3$.
+
+\paragraph{Sun and planets.} Mercury, Venus, Earth, Mars, Jupiter and Saturn
+move on ellipses whose elements change linearly with $T$
+\cite{simon1994numerical}. Kepler's equation $M=E-e\sin E$ gives each
+heliocentric position; subtracting the Earth's gives the geocentric one,
+which is rotated by the mean obliquity into right ascension and declination.
+
+\paragraph{Moon.} Longitude, latitude and distance are sums of selected
+periodic terms of the ELP-2000 theory \cite{chapront1983elp}. Phase and the
+orientation of the bright limb follow from the directions of Sun and Moon.
+
+\paragraph{Observer.} Positions of the Moon and planets are shifted for the
+observer's place on the WGS84 ellipsoid (diurnal parallax, up to $1^\circ$
+for the Moon). Altitudes are raised by Bennett's refraction formula at
+standard pressure and temperature.
+
+\paragraph{Stars.} The catalogue has 457 stars to magnitude 4 with J2000
+positions, moved to the date by linear precession:
+\begin{equation}
+\Delta\alpha = (m + n\sin\alpha\tan\delta)\,T, \qquad
+\Delta\delta = n\cos\alpha\;T .
+\end{equation}
+
+\paragraph{Accuracy.} Against worked examples in \cite{meeus1998astronomical}
+the Moon is within about $1'$ and the Sun and Venus within about $6'$. The
+model omits $\Delta T$, UT1, nutation, aberration, light-time and proper
+motion. It is not a precision ephemeris.
+
+\section{Seal}
+
+Altitude $a$ and azimuth $A$ are mapped to a disc by the stereographic
+projection centred on the zenith,
+\begin{equation}
+r=\tan\!\Big(\frac{90^\circ-a}{2}\Big),\quad x=r\sin A,\quad y=-r\cos A ,
+\end{equation}
+so the horizon is the circle $r=1$ and north is at the top.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\linewidth]{figures/seal.pdf}
+\caption{Seal of a file for Z\"urich ($47.3769^\circ$\,N, $8.5417^\circ$\,E,
+400\,m) at 22:00 UTC on 28 August 2026. The Moon and Saturn are above the
+horizon.}
+\label{fig:seal}
+\end{figure}
+
+Every mark carries information (Table~\ref{tab:marks}); there is no text, so
+no font or alphabet is needed to draw or read a seal. The document enters as
+a ring of 128 ticks between the horizon and the rim. Read clockwise from
+north, a long tick is 1 and a short tick is 0, and the bits are the leading
+128 bits of the file's SHA-256. Coordinates are rounded to five decimals and
+time to the second before drawing, so equal inputs give identical seals.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+Mark & Meaning \\
+\midrule
+Heavy circle & horizon \\
+Small central ring & zenith \\
+Two faint circles & altitudes $60^\circ$ and $30^\circ$ \\
+Wedge; three strokes & north; east, south, west \\
+Dots, five sizes & stars by brightness \\
+Eight-armed cross & celestial pole \\
+Curved line & ecliptic \\
+Strokes across it & the twelve signs, every $30^\circ$ \\
+Ram's horns & vernal point \\
+Part-filled disc & Moon and its phase \\
+Ringed point with sign & planet \\
+Ring with centre point & Sun \\
+Ticks in the rim & document, 128 bits \\
+\bottomrule
+\end{tabular}
+\caption{The marks of a seal.}
+\label{tab:marks}
+\end{table}
+
+\section{Reading}
+
+The reader uses only the geometry of the drawing.
+
+\paragraph{Stars.} Each dot is taken back through the projection and the
+refraction to a direction above the horizon. The stars carry no labels. Two
+bright dots are matched to a pair of catalogue stars of the same brightness
+class and the same angular separation; this fixes a trial orientation of the
+sky, which is kept if it brings the other bright dots onto catalogue stars.
+A least-squares rotation over all matched stars refines it. The direction of
+the zenith among the stars gives the latitude and the local sidereal time.
+
+\paragraph{Clock hands.} Sidereal time alone does not give the date. The
+positions of the Sun, Moon and planets among the stars do, and they do not
+depend on the observer's longitude. The reader scans a stated interval of
+years (1800 to 2200 by default) for the moments when the model puts the
+bodies where they are drawn. Planets are recognised by their signs.
+
+\paragraph{Fit.} From each candidate moment, latitude $\varphi$, longitude
+$\lambda$ and Julian Day are adjusted together to minimise
+\begin{equation}
+\sum_i \big\lVert\, p_i(\varphi,\lambda,\mathit{JD}) - y_i \big\rVert^2
+\end{equation}
+over the drawn bodies and the brightest stars, where $p_i$ is the model
+position and $y_i$ the drawn one. The best candidate is returned with an
+uncertainty estimated from the resolution of the drawing.
+
+\paragraph{Verification.} To verify a seal, the reader's result is drawn
+again and every star and body in the seal must coincide with one in the new
+drawing. The ticks are compared with the hash of the file offered. If a
+place and time are stated, the seal is also compared with the seal of
+exactly those values.
+
+\section{Results}
+
+Table~\ref{tab:results} summarises 300 seals drawn for random places
+between $85^\circ$\,S and $85^\circ$\,N and random moments between 1800 and
+2200, at the default size of 512 units, and then read back. Every seal that
+showed at least one body was assigned to the right date; one, showing Saturn
+alone near its retrograde loop, fitted a second date equally well, and the
+reader listed both. Latitude was
+recovered with a median error of $0.00014^\circ$ (15\,m) and a largest error of
+$0.0005^\circ$ (60\,m).
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Fastest body up & Share & Time & Longitude \\
+\midrule
+Moon & 49\% & 6 s & $0.02^\circ$ \\
+Sun or Mercury--Mars & 38\% & 44 s & $0.19^\circ$ \\
+Jupiter, Saturn only & 8\% & 20 min & $5^\circ$ \\
+None & 4\% & --- & --- \\
+\bottomrule
+\end{tabular}
+\caption{Median error of time and longitude read back from 300 random
+seals, by the fastest body above the horizon: the Moon; else the Sun,
+Mercury, Venus or Mars; else Jupiter or Saturn.}
+\label{tab:results}
+\end{table}
+
+How sharply a seal fixes the time depends on its fastest hand. The Moon
+moves about half a degree an hour and gives seconds. Jupiter and Saturn
+barely move in a day, and near their stationary points a seal showing only
+one of them leaves hours of doubt, which the reader reports. The largest
+errors in that row were 11 hours and, for longitude, the whole circle. Longitude
+follows from the time at $15^\circ$ per hour, so it inherits the same doubt.
+These figures measure the reader against the model that drew the seal. Read
+against the true sky, the errors of the model in Section~2 would be added.
+
+\section{Limits}
+
+\emph{A seal is a claim.} The sky of any place and moment can be computed by
+anyone, so a seal cannot show that its maker was there then. Verification
+shows that the drawing is a consistent sky and that the document is the one
+in the ring. Trust in the claim has to come from elsewhere, for example a
+cryptographic signature or a public timestamp over the seal.
+
+\emph{Some skies are silent.} With no Moon, Sun or planet above the horizon
+a seal gives latitude and sidereal time only. Marking the bodies below the
+horizon would remove this gap and is not yet done.
+
+\emph{Conventions remain.} Longitude is counted from Greenwich, the planets
+are marked with traditional signs, and the reader must be given the interval
+of years to search and the star catalogue. The altitude circles, the pole
+and the signs on the ecliptic make the construction legible, but the seal
+does not yet carry its own legend.
+
+\emph{Scope.} The reader decodes the program's own vector drawing. Reading a
+photograph or scan of a printed seal is not implemented. The model is meant
+for seals, not for navigation, surveying or historical dating.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

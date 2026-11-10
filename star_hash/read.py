@@ -35,7 +35,13 @@ from star_hash.ephemeris import (
 )
 from star_hash.invert import _residual_vector, _solve_3x3, solve_spacetime
 from star_hash.projection import stereographic_deproject
-from star_hash.render import ALCHEMICAL_SYMBOLS, HORIZON_MARGIN, RING_LONG, RING_SHORT
+from star_hash.render import (
+    ALCHEMICAL_SYMBOLS,
+    HORIZON_MARGIN,
+    PLANET_GLYPHS,
+    RING_LONG,
+    RING_SHORT,
+)
 from star_hash.stars import STAR_CATALOG
 
 Vec = Tuple[float, float, float]
@@ -50,6 +56,10 @@ _PLANET = re.compile(
     rf'<circle\s+cx="{_NUM}"\s+cy="{_NUM}"[^>]*/>\s*<circle[^>]*/>\s*<text[^>]*>([^<]*)</text>'
 )
 _PLANET_GROUP = re.compile(rf'<g id="planet-([a-z]+)">\s*<circle\s+cx="{_NUM}"\s+cy="{_NUM}"')
+_PLANET_SIGN = re.compile(
+    rf'<g>\s*<circle\s+cx="{_NUM}"\s+cy="{_NUM}"[^>]*/>\s*<circle[^>]*/>\s*<path[^>]*\sd="([^"]+)"'
+)
+_GLYPH_TO_NAME = {" ".join(d.split()): name for name, d in PLANET_GLYPHS.items()}
 _LINE = re.compile(rf'<line\s+x1="{_NUM}"\s+y1="{_NUM}"\s+x2="{_NUM}"\s+y2="{_NUM}"')
 _MOON_ARC = re.compile(rf"A\s+{_NUM}\s+{_NUM}\s+0\s+0\s+([01])\s+{_NUM}\s+{_NUM}\s+Z")
 
@@ -96,6 +106,7 @@ class Reading:
     candidates: int = 0
     note: str = ""
     document_ring: Optional[str] = None
+    alternatives: List[str] = field(default_factory=list)   # other dates that fit as well
 
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -200,12 +211,20 @@ def parse_drawing(svg: str) -> Drawing:
         if m:
             bodies["Sun"] = unit(float(m.group(1)), float(m.group(2)))
 
-    for m in _PLANET_GROUP.finditer(svg):
-        name = m.group(1).capitalize()
-        if name in PLANET_NAMES:
-            bodies[name] = unit(float(m.group(2)), float(m.group(3)))
+    # A planet is known by the sign engraved beside it.
+    planets_at = svg.find('<g id="planets">')
+    for m in _PLANET_SIGN.finditer(svg, planets_at if planets_at >= 0 else len(svg)):
+        name = _GLYPH_TO_NAME.get(" ".join(m.group(3).split()))
+        if name:
+            bodies[name] = unit(float(m.group(1)), float(m.group(2)))
     if not any(name in bodies for name in PLANET_NAMES):
-        # Drawings from version 1.0 mark planets with a text symbol instead.
+        # Version 1.1 drawings name the planet in the markup.
+        for m in _PLANET_GROUP.finditer(svg):
+            name = m.group(1).capitalize()
+            if name in PLANET_NAMES:
+                bodies[name] = unit(float(m.group(2)), float(m.group(3)))
+    if not any(name in bodies for name in PLANET_NAMES):
+        # Version 1.0 drawings mark planets with a text symbol.
         planets_group = re.search(r'<g id="planets">(.*?)</g>', svg, re.S)
         for m in _PLANET.finditer(planets_group.group(1) if planets_group else ""):
             name = _SYMBOL_TO_NAME.get(m.group(3).strip())
@@ -565,11 +584,17 @@ class _Clock:
                     t, c = self.refine(jd, 0.1)
                     found.append((c, t))
             else:
+                # A planet can pass the same spot more than once in a window
+                # (retrograde loop), so keep every local best, not just one.
                 samples = max(8, min(1600, int((b - a) / 0.25)))
                 step = (b - a) / samples
-                jd = min((a + i * step for i in range(samples + 1)), key=self.cost)
-                t, c = self.refine(jd, step)
-                found.append((c, t))
+                costs = [self.cost(a + i * step) for i in range(samples + 1)]
+                for i, value in enumerate(costs):
+                    before = costs[i - 1] if i > 0 else math.inf
+                    after = costs[i + 1] if i < samples else math.inf
+                    if value <= before and value < after:
+                        t, c = self.refine(a + i * step, step)
+                        found.append((c, t))
         found.sort()
         return found
 
@@ -640,8 +665,7 @@ def _profile(
 def read_seal(svg: str, year_from: int = 1800, year_to: int = 2200) -> Reading:
     """Recover latitude, longitude and time from a seal's drawing alone.
 
-    ``year_from`` and ``year_to`` bound the search for the date. Any embedded
-    claim is ignored. Raises :class:`SealReadError` if the drawing cannot be
+    ``year_from`` and ``year_to`` bound the search for the date. Raises :class:`SealReadError` if the drawing cannot be
     oriented against the star catalogue.
     """
     if year_to <= year_from:
@@ -690,10 +714,12 @@ def read_seal(svg: str, year_from: int = 1800, year_to: int = 2200) -> Reading:
             break
 
     best: Optional[Dict[str, Any]] = None
-    for _, jd in found[:8]:
+    solutions: List[Dict[str, Any]] = []
+    for _, jd in found[:12]:
         lat, lst = clock.site(jd_to_centuries(jd))
         lon = ((lst - local_sidereal_time(jd, 0.0)) * DEG + 180.0) % 360.0 - 180.0
         solution = solve_spacetime(points, initial_guess=(lat * DEG, lon, jd))
+        solutions.append(solution)
         if best is None or solution["residual_rms"] < best["residual_rms"]:
             best = solution
     assert best is not None
@@ -707,6 +733,20 @@ def read_seal(svg: str, year_from: int = 1800, year_to: int = 2200) -> Reading:
     sigmas = _uncertainty(points, state, max(best["residual_rms"], rounding))
     if sigmas and spread > sigmas[2]:
         sigmas = (sigmas[0], min(180.0, max(sigmas[1], spread * 360.98564736629)), spread)
+
+    # A slow planet returns to the same spot around its retrograde loop, so
+    # other dates may fit the drawing as well as the best one does.
+    slack = math.sqrt(best["residual_rms"] ** 2 + rounding ** 2 / 4.0)
+    other_days: List[float] = []
+    for solution in solutions:
+        jd = solution["julian_day"]
+        if (
+            solution["residual_rms"] <= slack
+            and abs(jd - state[2]) > max(1.0, 3.0 * spread)
+            and all(abs(jd - seen) > 1.0 for seen in other_days)
+        ):
+            other_days.append(jd)
+    alternatives = [iso for iso in (jd_to_iso(jd) for jd in sorted(other_days)) if iso]
     return Reading(
         latitude=state[0],
         longitude=state[1],
@@ -723,6 +763,7 @@ def read_seal(svg: str, year_from: int = 1800, year_to: int = 2200) -> Reading:
         sigma_time_s=sigmas[2] * 86400.0 if sigmas else None,
         candidates=len(found),
         document_ring=drawing.document_ring,
+        alternatives=alternatives,
         note=(
             "Only slow planets are above the horizon; time and longitude are loosely fixed."
             if slow_only else ""

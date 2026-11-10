@@ -64,22 +64,30 @@ def _cmd_sign(args: argparse.Namespace) -> int:
 
 
 def _cmd_verify(args: argparse.Namespace) -> int:
-    result = verify(_read_text(args.seal), args.document)
+    stated = [args.lat, args.lon, args.date]
+    if any(v is not None for v in stated) and any(v is None for v in stated):
+        raise ValueError("to check an exact claim give all of --lat, --lon and --date")
+    result = verify(
+        _read_text(args.seal), args.document,
+        latitude=args.lat, longitude=args.lon, date=args.date, elevation_m=args.elevation,
+        year_from=args.year_from, year_to=args.year_to,
+    )
     if args.json:
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return 0 if result["ok"] else 1
-    claim = result["claim"]
-    if claim and all(k in claim for k in ("latitude", "longitude", "time", "digest")):
-        print(f"Seal {claim['digest']}")
-        print(f"  claims {_place(claim['latitude'], claim['longitude'])} on {claim['time']}")
-        name = (claim.get("document") or {}).get("name")
-        if name:
-            print(f"  for    {name}")
+    reading = result["reading"]
+    if reading and reading["longitude"] is not None:
+        print(f"Seal shows {_place(reading['latitude'], reading['longitude'])} on {reading['time']}")
+        if reading["sigma_time_s"] is not None:
+            print(f"  ±    {reading['sigma_latitude_deg']:.5f}° lat, "
+                  f"{reading['sigma_longitude_deg']:.3f}° lon, {reading['sigma_time_s']:.0f} s")
+    for other in (reading or {}).get("alternatives", []):
+        print(f"  or   {other[:10]} fits the drawing equally well")
     marks = {True: "pass", False: "FAIL", None: "skip"}
     for check in result["checks"]:
         print(f"  [{marks[check['ok']]}] {check['detail']}")
     if result["ok"]:
-        print("Consistent. This confirms what the seal claims, not that the claim is true.")
+        print("Consistent. This confirms what the seal shows, not that it is true.")
     else:
         print("NOT VALID.")
     return 0 if result["ok"] else 1
@@ -106,6 +114,8 @@ def _cmd_read(args: argparse.Namespace) -> int:
             print(f"  ±      {reading.sigma_latitude_deg:.5f}° lat, "
                   f"{reading.sigma_longitude_deg:.3f}° lon, {reading.sigma_time_s:.0f} s")
         print(f"  from   {', '.join(reading.bodies)}")
+        for other in reading.alternatives:
+            print(f"  or     {other[:10]} fits the drawing equally well")
         if not reading.converged:
             print("  warning: the fit did not converge; treat this reading with care")
     if reading.note:
@@ -165,7 +175,13 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     p = commands.add_parser("verify", help="check a seal, and the document it was cast for")
     p.add_argument("seal", help="seal SVG written by `starhash sign`")
-    p.add_argument("document", nargs="?", default=None, help="the document to compare (optional)")
+    p.add_argument("document", nargs="?", default=None, help="the document to compare with the tick ring (optional)")
+    p.add_argument("--lat", type=float, default=None, help="stated latitude, to check the exact claim")
+    p.add_argument("--lon", type=float, default=None, help="stated longitude")
+    p.add_argument("--date", default=None, help="stated ISO 8601 time")
+    p.add_argument("--elevation", type=float, default=0.0, help="stated height in metres (default 0)")
+    p.add_argument("--from", dest="year_from", type=int, default=1800, help="earliest year to consider (default 1800)")
+    p.add_argument("--to", dest="year_to", type=int, default=2200, help="latest year to consider (default 2200)")
     p.add_argument("--json", action="store_true", help="print the result as JSON")
     p.set_defaults(run=_cmd_verify)
 

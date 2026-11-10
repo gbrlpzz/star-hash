@@ -30,13 +30,12 @@ Sealed  contract.pdf
 
 The time defaults to now; pass `--date 2026-08-28T22:00:00Z` (UTC unless an offset is given) to seal for another moment. To avoid typing your position each time, set `STARHASH_LAT`, `STARHASH_LON` and optionally `STARHASH_ELEVATION`. `-o` chooses where the seal is written.
 
-The seal has three layers:
+The seal is a drawing and nothing else. There is no hidden record, no text and no font; whatever a seal says, it says in its geometry:
 
-- the **sky** inside the horizon circle, north at the top marked by a wedge, which carries the place and time;
-- a **ring of 128 ticks** around the horizon, which carries the document: read clockwise from north, a long tick is 1 and a short tick is 0, spelling the first 128 bits of the file's SHA-256;
-- an invisible `<metadata>` record with the exact place and time, the full SHA-256 and a short id over all of them.
+- the **sky** inside the horizon circle, north at the top marked by a wedge, carries the place and time;
+- a **ring of 128 ticks** around the horizon carries the document: read clockwise from north, a long tick is 1 and a short tick is 0, spelling the first 128 bits of the file's SHA-256.
 
-The first two layers are the drawing itself, so they survive when the record is stripped or the seal is printed. Coordinates are kept to five decimals (about a metre) and time to the second, so the same inputs always give the same seal, byte for byte.
+Both survive printing. Coordinates are kept to five decimals (about a metre) and time to the second, so the same inputs always give the same seal, byte for byte. The `id` that `sign` prints is a short fingerprint of the exact place, time and document; it is not in the seal, so note it down if you want it.
 
 ### What each mark means
 
@@ -65,16 +64,22 @@ starhash verify contract.pdf.seal.svg contract.pdf
 ```
 
 ```
-Seal STARS-Ja6g-a7RJ-rtyh-erHa-Fn76-6q
-  claims 47.37690°N 8.54170°E on 2026-08-28T22:00:00Z
-  for    contract.pdf
-  [pass] place, time and document hash agree with the digest
-  [pass] drawing is exactly the sky of the recorded place and time
-  [pass] tick ring carries the recorded document hash
-  [pass] document is the one this seal was cast for
+Seal shows 47.37698°N 8.50423°E on 2026-08-28T22:00:09Z
+  ±    0.00021° lat, 0.030° lon, 7 s
+  [pass] drawing is a real sky, read as 2026-08-28T22:00:09Z
+  [pass] document is the one in the tick ring
+  [skip] no place and time stated, so not compared exactly
 ```
 
-The exit status is 0 if every check passes, 1 if any fails, and 2 if a file cannot be read. The document argument is optional; without it the seal is only checked against itself.
+`verify` works from the drawing alone. It reads the place and time back, redraws that sky and requires every star and planet to be where it should, and compares the file with the tick ring. If you also know what the seal is supposed to say, state it and the drawing is compared against that exactly:
+
+```bash
+starhash verify contract.pdf.seal.svg contract.pdf --lat 47.3769 --lon 8.5417 --elevation 400 --date 2026-08-28T22:00:00Z
+```
+
+At the default size the drawing resolves a stated place to about a hundred metres and a stated time to the second.
+
+The exit status is 0 if every check that ran passes, 1 if any fails, and 2 if a file cannot be read. The document argument is optional.
 
 ## Reading the sky back
 
@@ -93,7 +98,7 @@ Read from the drawing alone (207 of 207 stars identified)
 
 Give it a file as well (`starhash read seal.svg contract.pdf`) and it also checks the file against the tick ring, exiting 1 if they differ. This needs nothing but the drawing.
 
-`read` ignores the record and works from the geometry. The dots are matched to the star catalogue by their mutual angles, which gives latitude and sidereal time; the Moon, Sun and planets then act as clock hands that give the date, and longitude follows. It works on any Starhash drawing, signed or not. The date is searched between 1800 and 2200 unless `--from` and `--to` say otherwise.
+`read` is the decoding step on its own. The dots are matched to the star catalogue by their mutual angles, which gives latitude and sidereal time; the Moon, Sun and planets then act as clock hands that give the date, and longitude follows. It works on any Starhash drawing, with or without a ring. The date is searched between 1800 and 2200 unless `--from` and `--to` say otherwise.
 
 How sharply a drawing fixes the time depends on what was above the horizon:
 
@@ -104,13 +109,13 @@ How sharply a drawing fixes the time depends on what was above the horizon:
 | Jupiter or Saturn only | minutes to hours | degrees to tens of degrees |
 | none of them | not recoverable | not recoverable |
 
-Latitude is always good to about 20 metres. The reading prints its own uncertainty.
+Latitude is always good to about 20 metres. The reading prints its own uncertainty. A slow planet returns to the same spot around its retrograde loop, so a seal showing only Jupiter or Saturn can fit two or three dates a few months apart; when that happens the reading lists the others.
 
 ## What a seal does and does not show
 
-A seal is a **claim**, not a proof. `verify` shows that the drawing, the stated place and time, and the document belong together and have not been altered since. It cannot show that the signer was at that place at that time: the sky of any place and any moment can be computed by anyone. If you need that, pair the seal with something that carries trust of its own, such as a cryptographic signature over the seal file or a public timestamp.
+A seal is a **claim**, not a proof. `verify` shows that the drawing is a real sky and that the document is the one in its ring. It cannot show that the signer was at that place at that time: the sky of any place and any moment can be computed by anyone. If you need that, pair the seal with something that carries trust of its own, such as a cryptographic signature over the seal file or a public timestamp.
 
-The `read` command decodes Starhash's own SVG. A printed seal carries everything needed (sky and ring), but reading a photograph or scan of one is not implemented yet.
+The ring holds 128 bits of the hash, which is ample against forging a second document for an existing seal. `read` and `verify` decode Starhash's own SVG; a printed seal carries everything needed, but reading a photograph or scan of one is not implemented yet.
 
 ## Scope
 
@@ -144,8 +149,8 @@ seal = sign("contract.pdf", latitude=47.3769, longitude=8.5417,
 seal.save("contract.pdf.seal.svg")
 print(seal.digest)                      # STARS-Ja6g-a7RJ-...
 
-result = verify(seal.svg, "contract.pdf")
-print(result["ok"], result["checks"])
+result = verify(seal.svg, "contract.pdf")           # from the drawing alone
+print(result["ok"], result["checks"], result["reading"])
 
 reading = read_seal(seal.svg)           # from the drawing alone
 print(reading.latitude, reading.longitude, reading.time)
@@ -158,7 +163,7 @@ sky.save("sky.svg")
 
 ## Paper
 
-[`paper/starhash.pdf`](paper/starhash.pdf) is a short note on the astronomical model: the equations, their sources and their limits. It describes version 1.0 and predates document signing, the tick ring and the reader, so where it says a drawing cannot be decoded without labels, the software has since moved on.
+[`paper/starhash.pdf`](paper/starhash.pdf) is a short note on the model, the seal, the reader and their limits, with measured read-back accuracy. Its source is [`paper/starhash.tex`](paper/starhash.tex); build it with [Tectonic](https://tectonic-typesetting.github.io/): `cd paper && tectonic starhash.tex`.
 
 ## License
 
