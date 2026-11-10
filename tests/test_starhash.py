@@ -7,7 +7,7 @@ import re
 import tempfile
 import unittest
 
-from star_hash import CelestialSeal, invert, read_claim, read_seal, sign, starhash, verify
+from star_hash import CelestialSeal, invert, read_seal, sign, starhash, verify
 from star_hash.cli import main as cli_main
 from star_hash.ephemeris import (
     date_to_jd,
@@ -134,68 +134,71 @@ class TestSignedSeals(unittest.TestCase):
     PLACE = dict(latitude=47.3769, longitude=8.5417, elevation_m=400.0)
     WHEN = "2026-08-28T22:00:00Z"
 
-    def test_sign_and_verify_round_trip(self):
+    def test_seal_is_a_drawing_and_nothing_else(self):
         seal = sign(b"the deed", date=self.WHEN, **self.PLACE)
         self.assertTrue(seal.digest.startswith("STARS-"))
-        self.assertEqual(read_claim(seal.svg)["time"], self.WHEN)
-        result = verify(seal.svg, b"the deed")
-        self.assertTrue(result["ok"])
-        self.assertEqual([c["ok"] for c in result["checks"]], [True, True, True, True])
-        # Without the document the seal is still self-consistent.
-        self.assertTrue(verify(seal.svg)["ok"])
-        # The drawing is the plain sky; the record is not drawn.
+        for hidden in ("<metadata", "<text", "<!--", "<title", "<desc", "data-", "planet-"):
+            self.assertNotIn(hidden, seal.svg)
+        for private in (seal.digest, seal.claim["document"]["sha256"], "deed"):
+            self.assertNotIn(private, seal.svg)
+        # Apart from the ring it is the plain sky.
         plain = starhash(date=self.WHEN, **self.PLACE)
         self.assertEqual(seal.svg.count("<circle"), plain.svg.count("<circle"))
-        self.assertNotIn("<text", seal.svg)
 
-    def test_ring_carries_the_document_hash_without_the_record(self):
+    def test_verify_from_the_drawing(self):
+        seal = sign(b"the deed", date=self.WHEN, **self.PLACE)
+        result = verify(seal.svg, b"the deed")
+        self.assertTrue(result["ok"])
+        self.assertEqual([c["ok"] for c in result["checks"]], [True, True, None])
+        self.assertAlmostEqual(result["reading"]["latitude"], 47.3769, delta=0.005)
+        self.assertTrue(verify(seal.svg)["ok"])
+        self.assertFalse(verify(seal.svg, b"another deed")["ok"])
+
+        stated = verify(seal.svg, b"the deed", date=self.WHEN, **self.PLACE)
+        self.assertEqual([c["ok"] for c in stated["checks"]], [True, True, True])
+        elsewhere = verify(seal.svg, b"the deed", 47.5, 8.5417, self.WHEN)
+        self.assertFalse(elsewhere["ok"])
+        later = verify(seal.svg, b"the deed", 47.3769, 8.5417, "2026-08-28T22:00:05Z", 400.0)
+        self.assertFalse(later["ok"])
+
+    def test_verify_rejects_a_disturbed_sky(self):
+        seal = sign(b"the deed", date=self.WHEN, **self.PLACE)
+        stars = list(re.finditer(r'<circle cx="([\d.]+)" cy="[\d.]+" r="0\.79"', seal.svg))
+        star = stars[len(stars) // 2]
+        moved = seal.svg[:star.start(1)] + f"{float(star.group(1)) + 3:.2f}" + seal.svg[star.end(1):]
+        checks = {c["check"]: c["ok"] for c in verify(moved, b"the deed")["checks"]}
+        self.assertFalse(checks["sky"])
+        self.assertFalse(verify("<svg></svg>")["ok"])
+
+    def test_ring_carries_the_document_hash(self):
         import hashlib
         from star_hash.read import parse_drawing
         from star_hash.seal import ring_matches
 
         seal = sign(b"the deed", date=self.WHEN, **self.PLACE)
-        printed = re.sub(r"<metadata.*?</metadata>", "", seal.svg, flags=re.S)
-        ring = parse_drawing(printed).document_ring
+        ring = parse_drawing(seal.svg).document_ring
         self.assertEqual(ring, hashlib.sha256(b"the deed").hexdigest()[:32])
         self.assertTrue(ring_matches(ring, b"the deed"))
         self.assertFalse(ring_matches(ring, b"another deed"))
-        self.assertEqual(read_seal(printed).document_ring, ring)
-        # The bare sky has no ring, and a ring for another document fails verify.
+        self.assertEqual(read_seal(seal.svg).document_ring, ring)
         self.assertIsNone(parse_drawing(starhash(date=self.WHEN, **self.PLACE).svg).document_ring)
-        other = sign(b"another deed", date=self.WHEN, **self.PLACE)
-        record = re.search(r"<metadata.*?</metadata>", seal.svg, re.S).group(0)
-        regrafted = re.sub(r"<metadata.*?</metadata>", lambda _: record, other.svg, flags=re.S)
-        checks = {c["check"]: c["ok"] for c in verify(regrafted, b"the deed")["checks"]}
-        self.assertFalse(checks["ring"])
 
     def test_same_inputs_give_the_same_seal(self):
         a = sign(b"x", date=self.WHEN, **self.PLACE)
         b = sign(b"x", date="2026-08-29T00:00:00+02:00", **self.PLACE)
         self.assertEqual(a.svg, b.svg)
-        self.assertNotEqual(a.digest, sign(b"y", date=self.WHEN, **self.PLACE).digest)
+        self.assertNotEqual(a.svg, sign(b"y", date=self.WHEN, **self.PLACE).svg)
 
-    def test_verify_rejects_changes(self):
-        seal = sign(b"the deed", date=self.WHEN, **self.PLACE)
-        self.assertFalse(verify(seal.svg, b"another deed")["ok"])
-
-        moved_claim = seal.svg.replace('"latitude": 47.3769', '"latitude": 48.3769')
-        self.assertNotEqual(moved_claim, seal.svg)
-        self.assertFalse(verify(moved_claim)["ok"])
-
-        # Swap in the drawing of another night under the same record.
-        other = sign(b"the deed", date="2026-08-29T22:00:00Z", **self.PLACE)
-        record = re.search(r"<metadata.*?</metadata>", seal.svg, re.S).group(0)
-        swapped = re.sub(r"<metadata.*?</metadata>", lambda _: record, other.svg, flags=re.S)
-        checks = {c["check"]: c["ok"] for c in verify(swapped)["checks"]}
-        self.assertTrue(checks["record"])
-        self.assertFalse(checks["sky"])
-
-        self.assertFalse(verify(starhash(date=self.WHEN, **self.PLACE).svg)["ok"])
+    def test_every_planet_is_known_by_its_sign(self):
+        seal = starhash(35.0, 25.0, "2022-06-24T05:30:00Z")
+        up = {p["name"] for p in seal.planets if p["alt_rad"] > 0}
+        self.assertEqual(up, {"Mercury", "Venus", "Mars", "Jupiter", "Saturn"})
+        from star_hash.read import parse_drawing
+        self.assertTrue(up <= set(parse_drawing(seal.svg).bodies))
 
     def test_drawing_alone_gives_back_place_and_time(self):
         seal = sign(b"the deed", date=self.WHEN, **self.PLACE)
-        drawing_only = re.sub(r"<metadata.*?</metadata>", "", seal.svg, flags=re.S)
-        reading = read_seal(drawing_only)
+        reading = read_seal(seal.svg)
         self.assertTrue(reading.converged)
         self.assertIn("Moon", reading.bodies)
         self.assertAlmostEqual(reading.latitude, 47.3769, delta=0.005)
@@ -224,6 +227,8 @@ class TestSignedSeals(unittest.TestCase):
             self.assertEqual(cli_main(["sign", document] + args), 0)
             seal_path = document + ".seal.svg"
             self.assertEqual(cli_main(["verify", seal_path, document]), 0)
+            self.assertEqual(cli_main(["verify", seal_path, document] + args), 0)
+            self.assertEqual(cli_main(["verify", seal_path, "--lat", "1"]), 2)
             self.assertEqual(cli_main(["read", seal_path, document]), 0)
             with open(document, "a") as handle:
                 handle.write("!")

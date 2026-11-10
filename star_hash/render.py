@@ -270,7 +270,7 @@ def generate_svg_seal(
         side = -1.0 if x_proj > 0.0 else 1.0
         gx = px + side * 9.5 * scale
 
-        svg.append(f'      <g id="planet-{name.lower()}">')
+        svg.append('      <g>')
         svg.append(f'        <circle cx="{px:.2f}" cy="{py:.2f}" r="{3.2*scale:.2f}" fill="{PAPER}" stroke="{INK}" stroke-width="{w_fine:.2f}" />')
         svg.append(f'        <circle cx="{px:.2f}" cy="{py:.2f}" r="{1.0*scale:.2f}" fill="{INK}" />')
         glyph = PLANET_GLYPHS.get(name)

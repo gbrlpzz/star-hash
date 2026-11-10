@@ -1,5 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Celestial Spacetime Seal">
-  <metadata id="starhash">{"digest": "STARS-JDWy-s72j-Zc2C-m4qa-JFja-ab", "document": {"bytes": 1071, "name": "LICENSE", "sha256": "cdfb341ecc3028cdac99c880241903f3e79f2cff77cac52abb6a4370d224e951"}, "elevation_m": 400.0, "julian_day": 2461281.4166666665, "latitude": 47.3769, "longitude": 8.5417, "schema": "starhash/1", "time": "2026-08-28T22:00:00Z"}</metadata>
   <defs>
     <clipPath id="horizon_clip">
       <circle cx="512.00" cy="512.00" r="462.60" />
@@ -366,7 +365,7 @@
       <circle cx="480.61" cy="507.95" r="1.57" fill="#000000" />
     </g>
     <g id="planets">
-      <g id="planet-saturn">
+      <g>
         <circle cx="791.40" cy="630.31" r="7.19" fill="#ffffff" stroke="#000000" stroke-width="0.67" />
         <circle cx="791.40" cy="630.31" r="2.25" fill="#000000" />
         <path transform="translate(770.06,630.31) scale(2.2456)" d="M -1.6 -4.6 L -1.6 2.2 M -3.2 -3 L 0.2 -3 M -1.6 0 C -0.6 -2 2.2 -1.8 2.2 0.4 C 2.2 1.8 0.8 2.4 0.9 3.6 C 1 4.3 1.8 4.6 2.6 4.1" fill="none" stroke="#000000" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round" />

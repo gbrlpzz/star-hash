@@ -32,9 +32,9 @@ from star_hash.projection import stereographic_project
 from star_hash.render import generate_svg_seal
 from star_hash.invert import solve_spacetime, evaluate_forward_model
 from star_hash.read import Reading, SealReadError, read_seal
-from star_hash.seal import SignedSeal, read_claim, sign, verify
+from star_hash.seal import SignedSeal, sign, verify
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # Base58 alphabet for the compact digest
 BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
