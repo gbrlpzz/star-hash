@@ -14,15 +14,25 @@ from star_hash.ephemeris import (
     DEG,
     TWO_PI,
     normalize_rad,
-    earth_rotation_angle,
+    jd_to_centuries,
     mean_obliquity,
 )
 
 def local_sidereal_time(jd_ut: float, lon_rad: float) -> float:
-    """Computes Local Apparent Sidereal Time (LAST) at given observer longitude."""
-    # Using IAU 2000 Earth Rotation Angle as precise sidereal proxy
-    theta_era = earth_rotation_angle(jd_ut)
-    return normalize_rad(theta_era + lon_rad)
+    """Return approximate local mean sidereal time at east longitude.
+
+    The standard polynomial is evaluated with the supplied UTC-like Julian day
+    as a UT1 proxy. No observed Earth-orientation correction is applied.
+    """
+    d = jd_ut - 2451545.0
+    T = jd_to_centuries(jd_ut)
+    gmst_deg = (
+        280.46061837
+        + 360.98564736629 * d
+        + 0.000387933 * T * T
+        - (T * T * T) / 38710000.0
+    )
+    return normalize_rad(gmst_deg * RAD + lon_rad)
 
 def apply_topocentric_parallax(
     ra_rad: float,
