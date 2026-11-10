@@ -4,21 +4,25 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "starhash"
-version = "1.0.0"
-description = "Deep-Time Spacetime Inscription & Analytical Astrometry Engine"
+version = "1.1.0"
+description = "Seal documents with the sky of a place and time, and read the seals back"
 authors = [
   { name = "Gabriele Pizzi", email = "info@gabrielepizzi.com" },
 ]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["astronomy", "timestamp", "signature", "svg", "seal"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering :: Astronomy",
-    "Topic :: Security :: Cryptography",
-]
+  ]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/gbrlpzz/star-hash"
 
 [project.scripts]
 starhash = "star_hash.cli:main"

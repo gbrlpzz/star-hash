@@ -17,3 +17,7 @@ build/
 *.bbl
 *.blg
 *.synctex.gz
+
+# Local scratch
+/*.seal.svg
+paper/page-*.png

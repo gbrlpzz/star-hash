@@ -1,8 +1,8 @@
 """
 star_hash.stars
 ~~~~~~~~~~~~~~~
-Bright star catalog (457 stars, Vmag <= 4.0) with J2000 coordinates
-and IAU precession model.
+Bright-star catalogue (457 entries, Vmag <= 4.0) with J2000 coordinates
+and a simple linear precession correction.
 """
 from __future__ import annotations
 import math
@@ -15,7 +15,7 @@ def load_stars_for_epoch(T: float) -> List[Dict[str, Any]]:
     """
     Returns all catalog stars precessed to epoch T (centuries from J2000.0).
     """
-    # Precession displacement per century (Simon et al. / IAU 2006)
+    # Compact first-order precession approximation.
     m_deg = 1.281232 * T
     n_deg = 0.556753 * T
     rad = 0.017453292519943295

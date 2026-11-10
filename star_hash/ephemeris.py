@@ -1,9 +1,9 @@
 """
 star_hash.ephemeris
 ~~~~~~~~~~~~~~~~~~~
-Zero-dependency analytical celestial ephemeris.
-Implements truncated VSOP87D planetary theory, ELP-2000-82 lunar theory,
-and IAU 2006 precession-nutation/ERA models.
+Small, zero-dependency analytical celestial model.
+Uses low-order secular planetary elements and selected terms from the
+ELP-2000 lunar expansion, with an ERA rotation expression.
 """
 from __future__ import annotations
 
@@ -227,7 +227,7 @@ def planet_geocentric(name: str, T: float) -> Dict[str, Any]:
     }
 
 def moon_geocentric(T: float) -> Dict[str, Any]:
-    """Truncated analytical lunar theory (Meeus/Chapront ELP-2000)."""
+    """Evaluate a selected-term lunar expansion based on ELP-2000."""
     L_prime = normalize_deg(218.3164477 + 481267.8812854 * T - 0.0015786 * T**2 + T**3 / 538841.0)
     D = normalize_deg(297.8501921 + 445267.1114034 * T - 0.0018819 * T**2 + T**3 / 545868.0)
     M = normalize_deg(357.5291092 + 35999.0502909 * T - 0.0001536 * T**2 + T**3 / 24490000.0)
@@ -314,7 +314,7 @@ def moon_geocentric(T: float) -> Dict[str, Any]:
         + 175 * math.sin((A1 + F) * RAD)
     )
 
-    # Distance terms (0.1 meters)
+    # Distance terms in 0.001 km, as used by the tabulated expansion
     Sr = (
         -20905355 * math.cos(Mp_r)
         - 3699111 * math.cos(2 * D_r - Mp_r)
@@ -334,7 +334,7 @@ def moon_geocentric(T: float) -> Dict[str, Any]:
 
     lon_rad = normalize_deg(L_prime + Sl * 1e-6) * RAD
     lat_rad = (Sb * 1e-6) * RAD
-    dist_km = 385000.56 + (Sr * 1e-6)
+    dist_km = 385000.56 + (Sr * 1e-3)
 
     eps = mean_obliquity(T)
     cos_lat = math.cos(lat_rad)
